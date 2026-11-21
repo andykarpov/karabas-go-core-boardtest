@@ -8,15 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Status: plan only (2026-11-22), Ф0 next. Docs, in Russian: `docs/PLAN.md` (decisions, architecture, checks, phases), `docs/BACKLOG.md`. Follow the phases; record a changed decision in PLAN.md.
 
-Base: the SoC of `../karabas-go-core-menu` (VexRiscv rv32im, `kg_l2_rpc`, `menu_compose` gradient + ARGB palette, Noto 4 bpp fonts, the cursor, the ESP AT code, the host frame build `src/sw/host`) and its look. The difference (variant A, user 2026-11-22): the CPU code, its data and the screen are ALL in block RAM (a tile layer 80 x 30 of 10 x 20 glyphs over the gradient, no frame buffer, no blitter), so the SRAM and the SDRAM are never used by the UI and are tested destructively by RTL BIST engines. Never put code, stack or screen into the SRAM / SDRAM.
+Base: the SoC of `../karabas-go-core-menu` (VexRiscv rv32im, `kg_l2_rpc`, `menu_compose` gradient + ARGB palette, Noto 4 bpp fonts, the cursor, the ESP AT code, the host frame build `src/sw/host`) and its look. The difference (variant A, user 2026-11-22): the CPU code, its data and the screen are ALL in block RAM (a tile layer 80 x 30 of 10 x 20 cells over the gradient: the OSD 8 x 8 font of the firmware doubled in height, the mono logo x4, anti-aliased shapes; no frame buffer, no blitter; atlas `src/sw/tools/atlas.py`, frame model `mockup.py`, approved look `docs/img/f0_mock_*.png`), so the SRAM and the SDRAM are never used by the UI and are tested destructively by RTL BIST engines. Never put code, stack or screen into the SRAM / SDRAM.
 
 ## Rules of the core
 
 - Same style as the menu, not an exact copy (user). Every screen needs the user's approval (frames from the host build / sim first).
 - No exit item in the UI: the user presses Ctrl+Alt+Backspace (the Global Reset OSD item of `core.json`).
-- Read only on media that are not ours: CF / IDE (the bench card has the user's data), SD1 / SD2, SPI flash. A write test only on a scratch area the user named.
+- Read only on media that are not ours: CF / IDE (the bench card has the user's data), SD1 / SD2. A write test only on a scratch area the user named.
 - Base board set in Ф1 (all cores): audio peaks to the MCU, TAPE_IN / TAPE_OUT + `kg_tape_monitor`, MIDI_TX, ADC PCM1808, FT_CLK_OUT ~8 MHz on Mini / Mini G.
-- Board rules of our cores: syncs always present, Go `FDC_*` outputs 0 when unused, Mini G2 SDRAM `~CS` is on FLASH_CS_N (T3): detect the revision before the flash test, OSD switch index = item position unless `"index"`, Verilog-2001 for XST, build map / par with `-t 2` first.
+- Board rules of our cores: syncs always present, Go `FDC_*` outputs 0 when unused, Mini G2 SDRAM `~CS` is on FLASH_CS_N (T3): drive T3 as the SDRAM CS (no flash chip is fitted on any board, its group shows N/A), OSD switch index = item position unless `"index"`, Verilog-2001 for XST, build map / par with `-t 2` first.
 - Sims and tests run in seconds; a long sim only after asking. At most 2-3 sims in parallel.
 - `karabas-go-modules` is shared with other sessions: change it only in a git worktree, PR there, then move the submodule.
 - Before a step that needs the board or the HDMI capture, tell the user; take an hwq ticket; capture frames only after a yes; ask before a firmware flash.
