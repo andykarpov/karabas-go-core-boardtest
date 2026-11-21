@@ -20,7 +20,7 @@ Base: the SoC of `../karabas-go-core-menu` (VexRiscv rv32im, `kg_l2_rpc`, `menu_
 - Sims and tests run in seconds; a long sim only after asking. At most 2-3 sims in parallel.
 - `karabas-go-modules` is shared with other sessions: change it only in a git worktree, PR there, then move the submodule.
 - Before a step that needs the board or the HDMI capture, tell the user; take an hwq ticket; capture frames only after a yes; ask before a firmware flash.
-- Git: public repo `andykarpov/karabas-go-core-boardtest`; one branch per phase of `docs/PLAN.md`, one PR into master at its end; never push master directly after the initial commit. Stage explicit paths.
+- Git: public repo `andykarpov/karabas-go-core-boardtest`; one branch per phase of `docs/PLAN.md`, one PR into master at its end; never push master directly after the initial commit. Stage explicit paths. After a release (PR merged): `git checkout master && git pull`, `git submodule update`, delete the merged branch.
 
 ## Build (from Ф0)
 
