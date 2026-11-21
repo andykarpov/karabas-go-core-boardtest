@@ -16,6 +16,10 @@
 3. **Новый репозиторий `karabas-go-core-boardtest`**. Старые test / sdram-test — в архив после
    релиза (спросить).
 4. **Имя в списке ядер: «Karabas Board Test»** (`name` в `core.json`): ядро видно в меню.
+5. **Id `boardtest`**, файл `boardtest.kg` (новое ядро, `cores/test.kg` старого не заменяется на месте).
+6. **Выхода из теста в интерфейсе нет**: пользователь сам нажимает Ctrl+Alt+Backspace (Global Reset
+   прошивки, пункт OSD с этой клавишей в `core.json`).
+7. **Репо публичное сразу** (`andykarpov/karabas-go-core-boardtest`); PR на каждую фазу в master.
 
 ## Архитектура
 
@@ -83,7 +87,7 @@
 
 ## Фазы
 
-Одна ветка на фазу, один PR в конце фазы (локальный master до публикации репо).
+Одна ветка на фазу, один PR в master в конце фазы.
 
 ### Ф0. Проверка вписываемости на Mini G (`-t 2`)
 - Перенос SoC из menu: VexRiscv без кэшей, код в BRAM, загрузка `LOAD` из `.kg`; `menu_compose`;
@@ -117,13 +121,12 @@
 
 ### Ф5. Go, Mini и релиз
 - Верхи Go / Mini, сборка трёх плат, `.kg` (build `YYMMDDNN`), README.md + README.ru.md.
-- Релиз в `karabas-go`: заменить `cores/test.kg` (id и имя файла — решить, см. ниже); репо публичным
-  (спросить); старые test / sdram-test — в архив (спросить).
+- Релиз в `karabas-go`: `boardtest.kg` в `cores.json`; убрать ли `cores/test.kg` и архивировать
+  старые test / sdram-test — спросить.
 
 ## Открытые вопросы
 
-- Id ядра: оставить `test` (замена на месте, загрузка по имени `test` не меняется) или `boardtest`.
-- Выход из теста: CORES LAUNCH boot по RPC или Global Reset.
+См. `docs/BACKLOG.md`.
 
 ## Риски
 
