@@ -4,8 +4,8 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p out
-gcc -DHOST -O1 -Wall -Wno-unused-result -I.. -o out/host ../main.c ../tests.c ../mem.c ../scr.c ../util.c host.c
-S="main fpga sram sram_fail sdram sdram_slow sdram_fail rtc rtc_oldfw leds leds_oldfw matrix audio tape midi video video_bars video_ramp input"
+gcc -DHOST -O1 -Wall -Wno-unused-result -I.. -o out/host ../main.c ../tests.c ../mem.c ../per.c ../scr.c ../util.c host.c per_dev.c
+S="${S:-main fpga sram sram_fail sdram sdram_slow sdram_fail rtc rtc_oldfw leds leds_oldfw matrix audio tape midi video video_bars video_ramp input sd sd_none cf cf_none ft ft_fail wifi wifi_none}"
 for s in $S; do
   ./out/host $s out/$s.state
   python3 ../tools/frame_model.py out/$s.state ../../roms out/$s.ppm

@@ -118,22 +118,11 @@ module karabas_minig_top (
     output wire           FLASH_HOLD_N
 );
 
-// idle until their tests: the SRAM (no access: both chips deselected by MRD_N / MWR_N high), the SDRAM (no command:
-// ~CS on the G2 high), the CF bus, the ESP
+// the SPI flash: never fitted (its group shows N/A)
 assign FLASH_DI           = 1'b1;
 assign FLASH_SCK          = 1'b0;
 assign FLASH_WP_N         = 1'b1;
 assign FLASH_HOLD_N       = 1'b1;
-assign WCS_N              = 2'b11;
-assign WRD_N              = 1'b1;
-assign WWR_N              = 1'b1;
-assign WRESET_N           = 1'b1;
-assign WA                 = 3'b000;
-assign WD                 = 16'hzzzz;
-assign ESP32_SPI_CS_N     = 1'b1;
-assign UART_TX            = 1'b1;
-assign UART_RX            = 1'bz;
-assign UART_CTS           = 1'bz;
 
 // system clocks
 wire clk_sys, clk_sys_pll, clk_8mhz, clk_cpu;
@@ -180,10 +169,17 @@ always @(posedge clk_sys) begin
     dvi_only_s <= { dvi_only_s[0], dvi_only };
 end
 wire vdac2_sel = ft_vga_s[1];
-assign FT_SPI_CS_N = mcu_ft_spi_on ? mcu_ft_cs_n : 1'b1;
-assign FT_SPI_SCK = mcu_ft_spi_on ? mcu_sck_ibufg : 1'b1;
-assign SD_CLK = mcu_sck_ibufg;
-assign FT_SPI_MOSI = mcu_ft_spi_on ? mcu_ft_mosi : 1'b1;
+// the SPI master of bt_per (Ф3) has them while the CPU asks: the SD2 slot (the firmware uses it only under the boot
+// core), the FT812 bus with the ESP32 on it (never while the MCU has it, FT_SPI_ON)
+wire per_own_sd, per_own_ft, per_sck, per_mosi, per_sd_cs_n, per_ft_cs_n, per_esp32_cs_n, mcu_sd_mosi, mcu_sd_cs_n;
+wire per_ft = per_own_ft & ~mcu_ft_spi_on;
+assign FT_SPI_CS_N = mcu_ft_spi_on ? mcu_ft_cs_n : per_ft ? per_ft_cs_n : 1'b1;
+assign FT_SPI_SCK = mcu_ft_spi_on ? mcu_sck_ibufg : per_ft ? per_sck : 1'b0;
+assign FT_SPI_MOSI = mcu_ft_spi_on ? mcu_ft_mosi : per_ft ? per_mosi : 1'b1;
+assign ESP32_SPI_CS_N = per_ft ? per_esp32_cs_n : 1'b1;
+assign SD_CLK = per_own_sd ? per_sck : mcu_sck_ibufg;
+assign SD_DI = per_own_sd ? per_mosi : mcu_sd_mosi;
+assign SD_CS_N = per_own_sd ? per_sd_cs_n : mcu_sd_cs_n;
 
 wire ft_clk_ibufg, ft_clk_int;
 IBUFG ibufg_ft_clk(.I(FT_CLK), .O(ft_clk_ibufg));
@@ -331,7 +327,7 @@ kg_mcu2 #(
     .FT_MISO(FT_SPI_MISO), .FT_CS_N(mcu_ft_cs_n),
     .MATRIX_CMD(matrix_cmd), .MATRIX_CMD_WR(matrix_cmd_wr), .DEBUG_ADDR(16'd0), .DEBUG_DATA(16'd0),
     .RPC_A(rpc_a), .RPC_WE(rpc_we), .RPC_WD(rpc_wd), .RPC_RD(rpc_rd),
-    .SD2_SCK(), .SD2_MOSI(SD_DI), .SD2_MISO(SD_DO), .SD2_CS_N(SD_CS_N)
+    .SD2_SCK(), .SD2_MOSI(mcu_sd_mosi), .SD2_MISO(SD_DO), .SD2_CS_N(mcu_sd_cs_n)
 );
 
 //--------- the test computer ---------
@@ -366,15 +362,31 @@ wire [8:0] bio_a;
 wire [31:0] bio_wd, bio_rd, io_rd, sram_rd;
 wire sel_sram = bio_a[8:3] == 6'h08;
 wire sel_sdram = bio_a[8:3] == 6'h10;          // 0xa00 bt_sdram
-wire [31:0] sdram_rd;
-assign bio_rd = sel_sram ? sram_rd : sel_sdram ? sdram_rd : io_rd;
+wire sel_per = bio_a[8:4] == 5'h0c;            // 0xb00 bt_per
+wire sel_io = ~sel_sram & ~sel_sdram & ~sel_per;
+wire [31:0] sdram_rd, per_rd;
+assign bio_rd = sel_sram ? sram_rd : sel_sdram ? sdram_rd : sel_per ? per_rd : io_rd;
 bt_io #(.CLK_HZ(75000000)) io (
-    .clk(clk_cpu), .we(bio_we & ~sel_sram & ~sel_sdram), .a(bio_a), .wd(bio_wd), .rd(io_rd), .rd_go(bio_rd_go & ~sel_sram & ~sel_sdram),
+    .clk(clk_cpu), .we(bio_we & sel_io), .a(bio_a), .wd(bio_wd), .rd(io_rd), .rd_go(bio_rd_go & sel_io),
     .btns(btns), .dvi_only(dvi_only), .matrix_cmd(matrix_cmd), .matrix_cmd_wr(matrix_cmd_wr),
     .aud_ctl(aud_ctl), .aud_inc_l(aud_inc_l), .aud_inc_r(aud_inc_r),
     .smp_t(smp_t), .smp_adc_l(smp_adc_l), .smp_adc_r(smp_adc_r), .smp_mix_l(smp_mix_l), .smp_mix_r(smp_mix_r),
     .tape_in(TAPE_IN), .midi_tx(MIDI_TX)
 );
+
+//--------- SD2, FT812, ESP32, ESP8266, CF / IDE (Ф3) ---------
+wire [15:0] ide_do;
+wire ide_oe;
+bt_per #(.CLKS_PER_BIT(651)) per (
+    .clk(clk_cpu), .we(bio_we & sel_per), .a(bio_a[3:0]), .wd(bio_wd), .rd(per_rd), .rd_go(bio_rd_go & sel_per),
+    .own_sd(per_own_sd), .own_ft(per_own_ft), .mcu_ft_on(mcu_ft_spi_on), .spi_sck(per_sck), .spi_mosi(per_mosi),
+    .sd_cs_n(per_sd_cs_n), .ft_cs_n(per_ft_cs_n), .esp32_cs_n(per_esp32_cs_n), .sd_miso(SD_DO), .ft_miso(FT_SPI_MISO),
+    .sd_det_n(SD_DET_N), .ft_int_n(FT_INT_N),
+    .uart_rx(UART_RX), .uart_tx(UART_TX), .uart_cts(UART_CTS),
+    .ide_a(WA), .ide_cs_n(WCS_N), .ide_rd_n(WRD_N), .ide_wr_n(WWR_N), .ide_rst_n(WRESET_N), .ide_d_i(WD),
+    .ide_d_o(ide_do), .ide_d_oe(ide_oe)
+);
+assign WD = ide_oe ? ide_do : 16'hzzzz;
 
 //--------- the SRAM tester (Ф2) ---------
 wire [15:0] sram_do, sram_oe_n;

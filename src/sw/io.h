@@ -82,3 +82,21 @@ uint32_t host_rd(uint32_t off);
 #define SD_ST_LOCK  4u
 #define SD_ST_INIT  8u
 #define SD_WORDS    0x1000000u  // 16M halfwords
+
+// The storage and the modules bt_per (rtl/io/bt_per.v): MMIO 0x80000b00.. (offsets for IOW / IOR)
+#define PE_SPI_CTL  0xb00       // W: bits 1:0 the device (PE_SD2 / PE_FT / PE_ESP32), 2 CS on, 3 own SD2, 4 own the FT bus,
+                                //    15:8 the half period - 1; R: bit 0 busy, 1 the MCU has the FT bus, 2 a card in SD2, 3 FT_INT_N
+#define PE_SPI_DATA 0xb04       // W: a byte out; R: the byte of the last transfer
+#define PE_SPI_NEXT 0xb08       // R: the byte of the last transfer, and 0xFF goes out
+#define PE_UART     0xb10       // W: a byte to the ESP8266; R: bit 8 a byte (7..0, taken), 9 tx full, 10 bytes lost
+#define PE_UART_CTL 0xb14       // W: bit 0 CTS held (stop), 1 the rx fifo emptied; R: bytes in the rx fifo
+#define PE_IDE_GO   0xb20       // W: bits 2:0 the register, 3 CS1, 4 a write, 31:16 its data; R: bit 0 busy
+#define PE_IDE_DATA 0xb24       // R: the data of the last read cycle
+#define PE_IDE_RST  0xb28       // W: bit 0 RESET_N low
+#define PE_SD2      1u
+#define PE_FT       2u
+#define PE_ESP32    3u
+#define PE_CS       4u
+#define PE_OWN_SD   8u
+#define PE_OWN_FT   16u
+#define PE_HALF(h)  ((uint32_t) (h) << 8)
