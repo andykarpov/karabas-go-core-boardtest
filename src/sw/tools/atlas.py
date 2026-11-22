@@ -6,10 +6,10 @@ of the atlas and two colours of a 16 entry palette (fg, bg); a tile pixel is a 4
 (0..15): colour = bg + (fg - bg) * a / 15, alpha included, then menu_compose blends it over the
 gradient. The atlas holds:
 
-- the font: the 8 x 8 font of the firmware OSD (CP866, assets/osd_font_866.bin), each row twice
-  (8 x 16), centred in the cell, ASCII 32..126 (user 2026-11-22: rather than Noto Sans Mono);
-- the big digits of the clock: the same x2 wide, x3 high (16 x 24) at 8 px from the top of 2 x 2 tiles, so the
-  time and the date in rows 0-1 and 2-3 span the logo (y 8..72; user 2026-11-22, variant B);
+- the font: Terminus Font Bold 10 x 20 (assets/terminus_bold_10x20.bin of tools/mkterminus.py, SIL OFL 1.1,
+  assets/OFL-Terminus.txt), ASCII 32..126, one glyph = one cell (user 2026-11-23: the doubled 8 x 8 OSD font
+  of the firmware left 4 empty pixels between the letters); no clock (user 2026-11-23: its big digits of the
+  OSD font did not fit the style);
 - shapes (anti-aliased): solid, rounded ends of buttons, panel corners and edges, lines, meter
   fills, marks;
 - the mono logo of the Mini (assets/logo_mini_56x16.bin = firmware ui2.c logo_full with the m and
@@ -19,7 +19,7 @@ gradient. The atlas holds:
 The font, the digits and the logo are 1 bit (coverage 0 or 15), only the shapes use the 16 levels.
 
 Atlas().tiles is a list of bytes objects (cw * ch coverages each, row by row); .id[name] the tile
-index of a name ("ch:A", "big:1:0".."big:1:3" left-top, right-top, left-bottom, right-bottom,
+index of a name ("ch:A",
 shape names, "logo" -> (cols, rows, [indexes row by row])).
 """
 import os
@@ -27,7 +27,6 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "assets")
-BIG_CHARS = "0123456789:/ "  # the clock and the date only
 SS = 4  # supersampling of the shapes
 
 
@@ -40,19 +39,18 @@ def logo_bits(go=False):
     return bits
 
 
-def osd_font():
-    """The 8 x 8 font of the firmware OSD (CP866, 256 x 8 bytes, the left pixel in bit 7)."""
-    return open(os.path.join(ASSETS, "osd_font_866.bin"), "rb").read()
+def terminus():
+    """Terminus Font Bold 10 x 20: 95 glyphs (32..126) x 20 rows x 2 bytes, the left pixel in bit 15."""
+    return open(os.path.join(ASSETS, "terminus_bold_10x20.bin"), "rb").read()
 
 
 class Atlas:
-    def __init__(self, cw=10, ch=20, logo_xy=(8, 8), logo_scale=4, big_sy=3, big_dy=8):
+    def __init__(self, cw=10, ch=20, logo_xy=(8, 8), logo_scale=4):
         self.cw, self.ch = cw, ch
-        self.big_sy, self.big_dy = big_sy, big_dy
         self.tiles, self.id, self._idx = [], {}, {}
         self.add("empty", bytes(cw * ch))
         self.add("solid", bytes([15]) * (cw * ch))
-        self._osd_font()
+        self._font()
         self._shapes()
         self._logo(logo_xy, logo_scale, "logo")
         self._logo(logo_xy, logo_scale, "logo_go")
@@ -70,27 +68,16 @@ class Atlas:
             self.id[name] = i
         return i
 
-    def _osd_font(self):
-        """The OSD font, each row twice (8 x 16), centred in the cell, 1 bit; the big digits 16 x 24."""
-        f = osd_font()
-        def glyph(code, sx, sy):
-            img = Image.new("L", (8 * sx, 8 * sy), 0)
-            for y in range(8):
-                for x in range(8):
-                    if f[code * 8 + y] >> (7 - x) & 1:
-                        img.paste(255, (x * sx, y * sy, (x + 1) * sx, (y + 1) * sy))
-            return img
+    def _font(self):
+        """The text font (Terminus Bold 10 x 20), 1 bit."""
+        t = terminus()
         for c in range(32, 127):
             img = Image.new("L", (self.cw, self.ch), 0)
-            img.paste(glyph(c, 1, 2), ((self.cw - 8) // 2, (self.ch - 16) // 2))
+            for y in range(20):
+                row = t[(c - 32) * 40 + y * 2] << 8 | t[(c - 32) * 40 + y * 2 + 1]
+                for x in range(10):
+                    if row >> (15 - x) & 1: img.putpixel((x, y), 255)
             self.add("ch:" + chr(c), img)
-        W, H = 2 * self.cw, 2 * self.ch
-        for c in BIG_CHARS:
-            img = Image.new("L", (W, H), 0)
-            dy = (H - 8 * self.big_sy) // 2 if self.big_dy is None else self.big_dy
-            img.paste(glyph(ord(c), 2, self.big_sy), ((W - 16) // 2, dy))
-            for k, (x, y) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1))):
-                self.add(f"big:{c}:{k}", img.crop((x * self.cw, y * self.ch, (x + 1) * self.cw, (y + 1) * self.ch)))
 
     def _shape(self, name, draw_fn):
         big = Image.new("L", (self.cw * SS, self.ch * SS), 0)

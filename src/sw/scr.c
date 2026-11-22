@@ -56,18 +56,6 @@ void scr_fill(int c, int r, int w, int bg) {
   for (int i = 0; i < w; i++) scr_put(c + i, r, T_EMPTY, C_TEXT, bg);
 }
 
-void scr_big(int c, int r, const char *s, int fg) {
-  static const char chars[] = BIG_CHARS;
-  for (; *s; s++, c += 2) {
-    int k = 0;
-    while (chars[k] && chars[k] != *s) k++;
-    if (!chars[k]) k = sizeof(chars) - 2;   // the space
-    scr_put(c, r, t_big[k][0], fg, C_NONE);
-    scr_put(c + 1, r, t_big[k][1], fg, C_NONE);
-    scr_put(c, r + 1, t_big[k][2], fg, C_NONE);
-    scr_put(c + 1, r + 1, t_big[k][3], fg, C_NONE);
-  }
-}
 
 void scr_button(int c, int r, int w, const char *s, int color, int fg, int left, int dot) {
   scr_put(c, r, T_END_L, color, C_NONE);

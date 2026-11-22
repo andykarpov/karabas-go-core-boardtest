@@ -45,11 +45,6 @@ class Screen:
         for i, ch in enumerate(s):
             self.put(c + i, r, "ch:" + ch, fg, bg)
 
-    def big(self, c, r, s, fg="text"):
-        for i, ch in enumerate(s):
-            for k, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1))):
-                self.put(c + 2 * i + dx, r + dy, f"big:{ch}:{k}", fg)
-
     def fill(self, c, r, w, bg):
         for i in range(w):
             self.put(c + i, r, "empty", "text", bg)
@@ -122,9 +117,6 @@ STATUS = {"pass": "PASS", "fail": "FAIL", "run": "RUN", "idle": "--", "na": "N/A
 
 def header(s):
     s.logo(0, 0)
-    # the clock at the right edge: 8 big characters = 16 cells
-    s.big(s.cols - 17, 0, "12:59:01")
-    s.big(s.cols - 17, 2, "22/11/26")
 
 
 def main_screen(a):

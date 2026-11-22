@@ -7,7 +7,7 @@ A tile whose coverages are only 0 and 15 goes to the 1-bit atlas (code = its ind
 to the 4-bit one (code = 0x200 + its index). Pixel n = row * 10 + column of tile t is bit / nibble
 t * 200 + n of its atlas, the low bit / nibble of a byte first (as bt_tiles reads them)."""
 import sys
-from atlas import Atlas, BIG_CHARS
+from atlas import Atlas
 
 A1_MAX, A4_MAX = 8192 * 8 // 200, 4096 * 2 // 200   # the sizes of the RAMs in bt_tiles
 
@@ -40,17 +40,11 @@ def main(out1, out4, out_h):
          "#pragma once", "#include <stdint.h>", "",
          f"// 1-bit tiles {len(t1)} of {A1_MAX}, 4-bit tiles {len(t4)} of {A4_MAX}"]
     for name, i in sorted(a.id.items()):
-        if isinstance(i, int) and not name.startswith(("ch:", "big:")):
+        if isinstance(i, int) and not name.startswith("ch:"):
             h.append(f"#define T_{name.upper()} 0x{code[i]:03x}")
     h.append("// the font: the tile of character 32 + i")
     h.append("static const uint16_t t_font[95] = {")
     h.append("  " + ", ".join(f"0x{code[a.id['ch:' + chr(c)]]:03x}" for c in range(32, 127)) + " };")
-    h.append(f'// the big characters "{BIG_CHARS}": 2 x 2 tiles each, left-top, right-top, left-bottom, right-bottom')
-    h.append(f"#define BIG_CHARS \"{BIG_CHARS}\"")
-    h.append(f"static const uint16_t t_big[{len(BIG_CHARS)}][4] = {{")
-    for c in BIG_CHARS:
-        h.append("  { " + ", ".join(f"0x{code[a.id[f'big:{c}:{k}']]:03x}" for k in range(4)) + " },")
-    h.append("};")
     h.append("// the meter: k (0..10) columns filled")
     h.append(f"static const uint16_t t_bar[{a.cw + 1}] = {{ " + ", ".join(f"0x{code[a.id[f'bar{k}']]:03x}" for k in range(a.cw + 1)) + " };")
     cols, rows, idx = a.id["logo"]

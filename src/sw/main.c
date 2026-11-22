@@ -40,7 +40,7 @@ static void load_look(void) {
 static int sel;          // the group chosen
 static int open_g = -1;  // the page shown, -1 the main screen
 char board_name[8] = "?", fw_build[9] = "?";
-int fullscreen;          // a page shows a picture over the whole screen (no clock)
+int fullscreen;          // a page shows a picture over the whole screen (no header)
 
 static const char *st_text(int st) {
   switch (st) {
@@ -180,11 +180,9 @@ static void draw_verdict(void) {
   scr_text_n(24, VROW, t, COLS - 25, color, C_NONE);
 }
 
-static void draw_clock(void);
-static void draw_header(void) {
+static void draw_header(void) {   // no clock (user 2026-11-23: it did not fit the style)
   scr_clear();
   scr_logo(0, 0, C_LOGO, board_name[0] == 'G');   // "Go"
-  draw_clock();
 }
 
 static void draw_main(void) {
@@ -256,18 +254,6 @@ static void close_page(void) {
   draw_main();
 }
 
-static void draw_clock(void) {
-  uint8_t tm[8];
-  uint16_t n;
-  if (fullscreen || !rpc_enabled() || rpc_call(RPC_SYS, 1, 0, 0, tm, sizeof(tm), &n, 500) != RPC_OK || n < 7) return;
-  char t[12], *p = t;
-  p = fmt_u2(p, tm[4]); *p++ = ':'; p = fmt_u2(p, tm[5]); *p++ = ':'; fmt_u2(p, tm[6]);
-  scr_big(COLS - 17, 0, t, C_TEXT);
-  p = t;
-  p = fmt_u2(p, tm[3]); *p++ = '/'; p = fmt_u2(p, tm[2]); *p++ = '/'; fmt_u2(p, (uint32_t) (tm[0] | tm[1] << 8) % 100);
-  scr_big(COLS - 17, 2, t, C_TEXT);
-}
-
 // ---------------------------------------------------------------- the keys: the presses of the keyboard reports
 
 static uint32_t kbd0, kbd1, kbdn;
@@ -302,7 +288,7 @@ static int next_key(void) {
 // ---------------------------------------------------------------- the loop
 
 static int mx = SCR_W / 2, my = SCR_H / 2;
-static uint32_t mbtn, last_clock;
+static uint32_t mbtn;
 // the last mouse report for the pages (R_MOUSE clears on read: only poll_mouse reads it)
 int ms_dx, ms_dy;
 uint32_t ms_btn, ms_seq;
@@ -325,7 +311,6 @@ void app_init(void) {
   }
   scr_init();
   draw_main();
-  draw_clock();
   kbdn = R_KBDN;
   dbg("bt: drawn\n");
 }
@@ -385,10 +370,6 @@ void app_step(void) {
     if (k && g->key) g->key(g, k);
     if (open_g >= 0 && g->tick) g->tick(g);
     if (open_g >= 0 && g->v[7] == 2) { g->v[7] = 1; close_page(); return; }   // the page asked to be left
-  }
-  if (R_MS - last_clock >= 500) {
-    last_clock = R_MS;
-    draw_clock();
   }
 }
 
