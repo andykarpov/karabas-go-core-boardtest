@@ -14,7 +14,7 @@ $(R)/bt.bin: $(B)/bt.bin
 	cp $< $@
 
 # the atlases and their tile codes (atlas_gen.h, committed)
-$(R)/atlas1.bin $(R)/atlas4.bin atlas_gen.h: tools/atlas.py tools/mkatlas.py assets/osd_font_866.bin assets/logo_mini_56x16.bin
+$(R)/atlas1.bin $(R)/atlas4.bin atlas_gen.h: tools/atlas.py tools/mkatlas.py assets/osd_font_866.bin assets/terminus_bold_10x20.bin assets/logo_mini_56x16.bin
 	mkdir -p $(R)
 	python3 tools/mkatlas.py $(R)/atlas1.bin $(R)/atlas4.bin atlas_gen.h
 

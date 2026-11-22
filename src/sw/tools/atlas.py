@@ -6,8 +6,9 @@ of the atlas and two colours of a 16 entry palette (fg, bg); a tile pixel is a 4
 (0..15): colour = bg + (fg - bg) * a / 15, alpha included, then menu_compose blends it over the
 gradient. The atlas holds:
 
-- the font: the 8 x 8 font of the firmware OSD (CP866, assets/osd_font_866.bin), each row twice
-  (8 x 16), centred in the cell, ASCII 32..126 (user 2026-11-22: rather than Noto Sans Mono);
+- the font: Terminus Font Bold 10 x 20 (assets/terminus_bold_10x20.bin of tools/mkterminus.py, SIL OFL 1.1,
+  assets/OFL-Terminus.txt), ASCII 32..126, one glyph = one cell (user 2026-11-23: the doubled 8 x 8 OSD font
+  of the firmware left 4 empty pixels between the letters); the big digits stay of the OSD font;
 - the big digits of the clock: the same x2 wide, x3 high (16 x 24) at 8 px from the top of 2 x 2 tiles, so the
   time and the date in rows 0-1 and 2-3 span the logo (y 8..72; user 2026-11-22, variant B);
 - shapes (anti-aliased): solid, rounded ends of buttons, panel corners and edges, lines, meter
@@ -38,6 +39,11 @@ def logo_bits(go=False):
         for y in range(11, 16):
             for x in range(26, 39): bits[y][x] = 0
     return bits
+
+
+def terminus():
+    """Terminus Font Bold 10 x 20: 95 glyphs (32..126) x 20 rows x 2 bytes, the left pixel in bit 15."""
+    return open(os.path.join(ASSETS, "terminus_bold_10x20.bin"), "rb").read()
 
 
 def osd_font():
@@ -71,7 +77,7 @@ class Atlas:
         return i
 
     def _osd_font(self):
-        """The OSD font, each row twice (8 x 16), centred in the cell, 1 bit; the big digits 16 x 24."""
+        """The text font (Terminus Bold 10 x 20), 1 bit; the big digits of the OSD font, 16 x 24."""
         f = osd_font()
         def glyph(code, sx, sy):
             img = Image.new("L", (8 * sx, 8 * sy), 0)
@@ -80,9 +86,13 @@ class Atlas:
                     if f[code * 8 + y] >> (7 - x) & 1:
                         img.paste(255, (x * sx, y * sy, (x + 1) * sx, (y + 1) * sy))
             return img
+        t = terminus()
         for c in range(32, 127):
             img = Image.new("L", (self.cw, self.ch), 0)
-            img.paste(glyph(c, 1, 2), ((self.cw - 8) // 2, (self.ch - 16) // 2))
+            for y in range(20):
+                row = t[(c - 32) * 40 + y * 2] << 8 | t[(c - 32) * 40 + y * 2 + 1]
+                for x in range(10):
+                    if row >> (15 - x) & 1: img.putpixel((x, y), 255)
             self.add("ch:" + chr(c), img)
         W, H = 2 * self.cw, 2 * self.ch
         for c in BIG_CHARS:
