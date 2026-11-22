@@ -28,4 +28,4 @@ void scr_button(int c, int r, int w, const char *s, int color, int fg, int left,
 void scr_pill(int c, int r, const char *s, int color);   // a button as wide as its text + 2
 void scr_uline(int c, int r, int w, int fg);
 void scr_meter(int c, int r, int w, int permille, int fg);
-void scr_logo(int c, int r, int fg);
+void scr_logo(int c, int r, int fg, int go);  // go: the logo of the Go (no "mini")

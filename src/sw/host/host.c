@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
   const char *sc = argv[1];
   if (!strcmp(sc, "rtc_oldfw") || !strcmp(sc, "leds_oldfw") || !strcmp(sc, "sd_none")) fw_new = 0;
   if (!strcmp(sc, "sd_none")) dev_sd2 = 0;
-  if (!strcmp(sc, "floppy") || !strcmp(sc, "go_main")) host_board = 1;
+  if (!strcmp(sc, "floppy") || !strcmp(sc, "go_main") || !strcmp(sc, "rtc_go")) host_board = 1;   // rtc_go: no 0x41
   if (!strcmp(sc, "cf_none")) dev_cf = 0;
   if (!strcmp(sc, "ft_fail")) dev_ft = 0;
   if (!strcmp(sc, "wifi_none")) { dev_8266 = 0; dev_e32 = 0; }
@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
     press(K_DOWN); press(K_DOWN); press(K_UP);   // redraws the main screen with the results
     app_open(0); press(K_ESC);
   } else if (!strcmp(sc, "fpga")) { app_open(find("FPGA / MCU")); run(100); }
-  else if (!strcmp(sc, "rtc") || !strcmp(sc, "rtc_oldfw")) { app_open(find("RTC / EEPROM")); run(3000); }
+  else if (!strcmp(sc, "rtc") || !strcmp(sc, "rtc_oldfw") || !strcmp(sc, "rtc_go")) { app_open(find("RTC / EEPROM")); run(3000); }
   else if (!strcmp(sc, "leds") || !strcmp(sc, "leds_oldfw")) {
     app_open(find("Buttons / LEDs"));
     regs[0x808 / 4] = 1; run(100); regs[0x808 / 4] = 0; run(100); regs[0x808 / 4] = 2; run(100);   // BTN 1 pressed, released, BTN 2 held
