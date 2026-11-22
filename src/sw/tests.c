@@ -71,7 +71,7 @@ static void fpga_open(group_t *g) {
   page_row(1, "Board", board_name, C_TEXT);
   page_row(2, "Firmware", fw_build, C_TEXT);
   page_row(3, "MCU link", rpc_enabled() ? "link v2, RPC up" : "no RPC (old firmware?)", rpc_enabled() ? C_TEXT : C_FAIL);
-  page_row(4, "CPU", "VexRiscv rv32im 75 MHz, 32 KB block RAM", C_TEXT);
+  page_row(4, "CPU", "VexRiscv rv32im 75 MHz, 48 KB block RAM", C_TEXT);
   page_row(5, "Video", (IO_BTN >> 8) & 1 ? "DVI (no audio), 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
   int ok = (hi >> 31) && rpc_enabled();
   p = str_cpy(t, "DNA "); fmt_hex(p, lo, 8);
@@ -508,8 +508,8 @@ static void later_open(group_t *g) {
 
 group_t groups[] = {
   { "FPGA / MCU", fpga_open, 0, 0, 0, ST_IDLE, "", {0} },
-  { "SRAM", later_open, 0, 0, 0, ST_IDLE, "", {0} },
-  { "SDRAM", later_open, 0, 0, 0, ST_IDLE, "", {0} },
+  { "SRAM", sram_open, sram_tick, sram_key, 0, ST_IDLE, "", {0} },
+  { "SDRAM", sdram_open, sdram_tick, sdram_key, 0, ST_IDLE, "", {0} },
   { "SPI flash", later_open, 0, 0, 0, ST_NA, "not fitted", {0, 0, 0, 0, 0, 0, 1, 0} },
   { "SD cards", later_open, 0, 0, 0, ST_IDLE, "", {0} },
   { "CF / IDE", later_open, 0, 0, 0, ST_IDLE, "", {0} },

@@ -9,7 +9,7 @@
  menu_soc.v of karabas-go-core-menu.
 
  Memory map of the CPU (sw/mmio.h):
-   0x00000000 RAM, (1 << MEM_AW) words (block RAM, the program from 0: the ROM of boardtest.kg)
+   0x00000000 RAM, 48 KB in two banks (block RAM, the program from 0: the ROM of boardtest.kg)
    0x80000000 MMIO (uncached: the VexRiscv IO range = bit 31), word registers:
      00 W  DBG: a byte of the debug console (dbg_uart, the testbench prints it)
      08 R  FRAMES: frames begun (the start of the vertical sync)
@@ -42,7 +42,8 @@
 module bt_soc #(
 	parameter MS_DIV = 17'd75000,         // clocks per millisecond
 	parameter US_DIV = 7'd75,             // clocks per microsecond
-	parameter MEM_AW = 13,                // RAM words: 8K = 32 KB
+	parameter MEM_AW = 13,                // RAM bank 0 words: 8K = 32 KB
+	parameter MEM1_AW = 12,               // RAM bank 1 words from 8K: 4K = 16 KB (48 KB in all)
 	parameter [31:0] RESET_VECTOR = 32'h00000000
 ) (
 	input wire clk,
@@ -170,15 +171,24 @@ wire d_io = d_adr[29];                      // 0x80000000
 // ------------------------------------------------------------------ RAM: port A data (or the loader), port B fetch
 
 reg m_ack = 1'b0;
+// two banks: words 0..8191 (32 KB, MEM_AW) and 8192.. (16 KB, MEM1_AW); the address is held until the ack, so the
+// bank of a read is chosen by it then
 wire [3:0] ram_we = cpu_reset ? (ld_ram ? (4'b0001 << ld_addr[1:0]) : 4'b0000)
                               : ((d_req && !d_io && d_we && !m_ack) ? d_sel : 4'b0000);
-wire [MEM_AW-1:0] ram_aa = cpu_reset ? ld_addr[MEM_AW+1:2] : d_adr[MEM_AW-1:0];
+wire [MEM_AW:0] ram_aa = cpu_reset ? ld_addr[MEM_AW+2:2] : d_adr[MEM_AW:0];
 wire [31:0] ram_da = cpu_reset ? {4{ld_data}} : d_dat_o;
-wire [31:0] ram_qa;
+wire [31:0] ram_qa0, ram_qa1, i_dat0, i_dat1;
+wire ram_b1 = ram_aa[MEM_AW];
 kg_tdpram #(.DW(32), .AW(MEM_AW), .WE_W(4), .WRITE_FIRST(0)) ram (
-	.clka(clk), .ena(1'b1), .wea(ram_we), .addra(ram_aa), .dina(ram_da), .douta(ram_qa),
-	.clkb(clk), .enb(1'b1), .web(4'b0000), .addrb(i_adr[MEM_AW-1:0]), .dinb(32'd0), .doutb(i_dat_i)
+	.clka(clk), .ena(1'b1), .wea(ram_b1 ? 4'b0000 : ram_we), .addra(ram_aa[MEM_AW-1:0]), .dina(ram_da), .douta(ram_qa0),
+	.clkb(clk), .enb(1'b1), .web(4'b0000), .addrb(i_adr[MEM_AW-1:0]), .dinb(32'd0), .doutb(i_dat0)
 );
+kg_tdpram #(.DW(32), .AW(MEM1_AW), .WE_W(4), .WRITE_FIRST(0)) ram1 (
+	.clka(clk), .ena(1'b1), .wea(ram_b1 ? ram_we : 4'b0000), .addra(ram_aa[MEM1_AW-1:0]), .dina(ram_da), .douta(ram_qa1),
+	.clkb(clk), .enb(1'b1), .web(4'b0000), .addrb(i_adr[MEM1_AW-1:0]), .dinb(32'd0), .doutb(i_dat1)
+);
+wire [31:0] ram_qa = d_adr[MEM_AW] ? ram_qa1 : ram_qa0;
+assign i_dat_i = i_adr[MEM_AW] ? i_dat1 : i_dat0;
 
 // an access: the address is read at the first edge, the ack with the data a clock later (a burst
 // holds STB and moves the address after each ack)

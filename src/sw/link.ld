@@ -1,9 +1,9 @@
-/* The board test program in the block RAM of bt_soc (MEM_AW 13: 32 KB): the program, data, bss and the
+/* The board test program in the block RAM of bt_soc (two banks, 48 KB): the program, data, bss and the
    stack; MMIO at 0x80000000. No heap (no libc). */
 OUTPUT_ARCH("riscv")
 ENTRY(_start)
 
-MEMORY { RAM (rwx) : ORIGIN = 0x00000000, LENGTH = 32K }
+MEMORY { RAM (rwx) : ORIGIN = 0x00000000, LENGTH = 48K }
 
 STACK_SIZE = 4K;
 
