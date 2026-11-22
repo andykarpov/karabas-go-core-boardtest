@@ -193,6 +193,18 @@ ESP32 — ZiFi32 GET_VER и GET_INFO_STR (сборка). Записей на н�
   петли кабелем.
 - FDD Go (может уйти в Ф5, если без платы с дисководом).
 
+**Решения Ф4 (пользователь 2026-11-22):** проверка USB serial — не делаем; отчёт через USB CDC — не делаем (бэклог);
+прогон по кругу — да; петли кабелем — ручные (страницы Audio / Tape), не в Auto. FDD Go — в Ф5.
+
+**Состояние Ф4 (ветка `phase/f4`, сборка 26112210):** кнопки Auto / Loop (и клавиши A / L, Esc — стоп) в строке 26
+главного экрана, там же итог платы: «BOARD FAULTY: N groups fail», «No faults so far, N to check by hand»,
+«BOARD OK: every group passes». Прогон в фоне: open / tick группы при `scr_mute` (страница не рисуется), строка группы
+обновляется; порядок FPGA / MCU, RTC / EEPROM, SD cards, CF / IDE, FT812, Wi-Fi, MIDI, SRAM, SDRAM (последней); вопрос
+оператору (MIDI не услышан) — «Y/N on page»; 10 мин на группу. Loop: группа, упавшая хоть раз, остаётся FAIL
+(«N of M failed»). Floppy — N/A не на Go. На плате: Auto — все 9 групп PASS за ~1,5 мин
+(`docs/img/f4_board_auto_*.png`). Makefile: XST / PAR зависят от хэша содержимого исходников, не от mtime (git checkout
+больше не запускает пересборку).
+
 ### Ф5. Go, Mini и релиз
 - Верхи Go / Mini, сборка трёх плат, `.kg` (build `YYMMDDNN`), README.md + README.ru.md.
 - Релиз в `karabas-go`: `boardtest.kg` в `cores.json`; убрать ли `cores/test.kg` и архивировать

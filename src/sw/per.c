@@ -158,8 +158,8 @@ void sd_open(group_t *g) {
   spi_set(0);
   int s1 = g->v[0];
   int st = s1 == ST_FAIL || s2 == ST_FAIL ? ST_FAIL : s1 == ST_PASS || s2 == ST_PASS ? ST_PASS : ST_NA;
-  char *p = str_cpy(t, s1 == ST_PASS ? "SD1 ok" : s1 == ST_FAIL ? "SD1 FAIL" : "SD1 n/a");
-  str_cpy(p, s2 == ST_PASS ? ", SD2 ok" : s2 == ST_FAIL ? ", SD2 FAIL" : ", no SD2");
+  char *p = str_cpy(t, s1 == ST_PASS ? "SD1 ok" : s1 == ST_FAIL ? "SD1 FAIL" : "SD1 -");
+  str_cpy(p, s2 == ST_PASS ? " SD2 ok" : s2 == ST_FAIL ? " SD2 FAIL" : " SD2 -");
   set_status(g, st, t);
   page_hint("Nothing is written to the cards");
 }
@@ -260,7 +260,7 @@ static int cf_check(void) {
 
 void cf_open(group_t *g) {
   int st = cf_check();
-  set_status(g, st, st == ST_PASS ? "IDENTIFY, read" : st == ST_NA ? "no device" : "FAIL");
+  set_status(g, st, st == ST_PASS ? "read ok" : st == ST_NA ? "no device" : "FAIL");
   page_hint("Read only: IDENTIFY and READ SECTORS (the card has your data)");
 }
 
@@ -316,7 +316,7 @@ static int ft_check(void) {
 void ft_open(group_t *g) {
   int st = ft_check();
   spi_set(0);
-  set_status(g, st, st == ST_PASS ? "REG_ID, 48 MHz" : st == ST_NA ? "MCU has it" : "FAIL");
+  set_status(g, st, st == ST_PASS ? "ID 7C, 49 MHz" : st == ST_NA ? "MCU has it" : "FAIL");
   page_hint("The FT812 is woken up as the firmware does; its picture: later");
 }
 
@@ -446,8 +446,8 @@ void wifi_open(group_t *g) {
 static void wifi_done(group_t *g) {
   int a = g->v[2], b = g->v[3];
   int st = a == ST_FAIL || b == ST_FAIL ? ST_FAIL : a == ST_PASS || b == ST_PASS ? ST_PASS : ST_NA;
-  char *p = str_cpy(t, a == ST_PASS ? "8266 ok" : a == ST_FAIL ? "8266 FAIL" : "no 8266");
-  str_cpy(p, b == ST_PASS ? ", 32 ok" : b == ST_FAIL ? ", 32 FAIL" : "");
+  char *p = str_cpy(t, a == ST_PASS ? "8266 ok" : a == ST_FAIL ? "8266 FAIL" : "8266 -");
+  str_cpy(p, b == ST_PASS ? " 32 ok" : b == ST_FAIL ? " 32 FAIL" : "");
   set_status(g, st, t);
   g->v[0] = 99;
 }

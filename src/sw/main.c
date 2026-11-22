@@ -66,7 +66,118 @@ static void draw_group(int i) {
   int col = i < PER_COL ? 1 : COL2, row = 8 + 2 * (i % PER_COL);
   scr_button(col, row, 17, g->name, i == sel ? C_ACTIVE : C_BUTTON, C_TEXT_A, 1, -2);
   scr_pill(col + 18, row, st_text(g->status), st_color(g->status));
-  scr_text_n(col + 25, row, g->info[0] ? g->info : "not run", COL2 - 2 - 25 + (col == 1 ? 0 : 1), C_DIM, C_NONE);
+  scr_text_n(col + 25, row, g->info[0] ? g->info : g->status == ST_RUN ? "running" : "not run", COL2 - 2 - 25 + (col == 1 ? 0 : 1), C_DIM, C_NONE);
+}
+
+// ---------------------------------------------------------------- the auto run (Ф4)
+// The checks that need no operator run one after the other in the background (their pages muted: scr_mute), the
+// main screen shows each result as it comes; SDRAM last (the USB of the board drops while it runs). Loop repeats
+// the run: a group that failed once stays FAIL with its count.
+
+static const char *const auto_names[] = { "FPGA / MCU", "RTC / EEPROM", "SD cards", "CF / IDE", "FT812", "Wi-Fi", "MIDI",
+                                          "SRAM", "SDRAM" };
+#define NAUTO ((int) (sizeof(auto_names) / sizeof(auto_names[0])))
+#define AUTO_MS 600000u                 // a group not done in 10 minutes is a FAIL
+static int auto_on, auto_loop, auto_k, auto_started, auto_rounds;
+static uint32_t auto_t0;
+static uint16_t auto_fails[24];
+static void draw_group(int i);
+static void draw_verdict(void);
+
+static int group_index(const char *name) {
+  for (int i = 0; i < ngroups; i++) {
+    const char *a = groups[i].name, *b = name;
+    while (*a && *a == *b) { a++; b++; }
+    if (*a == *b) return i;
+  }
+  return 0;
+}
+
+static void auto_start(int loop) {
+  auto_on = 1; auto_loop = loop; auto_k = 0; auto_started = 0; auto_rounds = 0;
+  for (int i = 0; i < ngroups; i++) auto_fails[i] = 0;
+  draw_verdict();
+}
+
+static void auto_stop(void) {
+  if (auto_started) {
+    group_t *g = &groups[group_index(auto_names[auto_k])];
+    scr_mute = 1;
+    if (g->close) g->close(g);
+    mem_stop();
+    scr_mute = 0;
+    if (g->status == ST_RUN) { g->status = ST_IDLE; str_cpy(g->info, "stopped"); }
+    draw_group(group_index(auto_names[auto_k]));
+  }
+  auto_on = 0; auto_started = 0;
+  draw_verdict();
+}
+
+static void auto_step(void) {
+  int i = group_index(auto_names[auto_k]);
+  group_t *g = &groups[i];
+  scr_mute = 1;
+  if (!auto_started) {
+    g->status = ST_IDLE; g->info[0] = 0;
+    for (int k = 0; k < 8; k++) g->v[k] = 0;
+    if (g->open) g->open(g);
+    auto_started = 1; auto_t0 = R_MS;
+    scr_mute = 0;
+    draw_group(i);
+    draw_verdict();
+    scr_mute = 1;
+  } else if (g->tick) g->tick(g);
+  scr_mute = 0;
+  int done = g->status != ST_RUN;
+  if (!done && R_MS - auto_t0 > AUTO_MS) { g->status = ST_FAIL; str_cpy(g->info, "timeout"); done = 1; }
+  if (!done) return;
+  scr_mute = 1;
+  if (g->close) g->close(g);
+  mem_stop();
+  scr_mute = 0;
+  if (g->status == ST_ASK) str_cpy(g->info, "Y/N on page");
+  if (g->status == ST_FAIL) auto_fails[i]++;
+  else if (auto_fails[i]) {   // failed in an earlier round
+    char *p = fmt_u(g->info, auto_fails[i]); p = str_cpy(p, " of "); fmt_u(p, (uint32_t) auto_rounds + 1); str_cpy(g->info + str_len(g->info), " failed");
+    g->status = ST_FAIL;
+  }
+  draw_group(i);
+  auto_started = 0;
+  if (++auto_k < NAUTO) { draw_verdict(); return; }
+  auto_k = 0; auto_rounds++;
+  if (!auto_loop) auto_on = 0;
+  draw_verdict();
+}
+
+// the line of the verdict and the buttons Auto / Loop (row 26)
+#define VROW 26
+static void draw_verdict(void) {
+  scr_fill(1, VROW, COLS - 2, C_NONE);
+  scr_button(1, VROW, 10, "Auto", auto_on && !auto_loop ? C_ACTIVE : C_BUTTON, C_TEXT_A, 0, -2);
+  scr_button(12, VROW, 10, "Loop", auto_on && auto_loop ? C_ACTIVE : C_BUTTON, C_TEXT_A, 0, -2);
+  char t[64], *p = t;
+  int color = C_TEXT, fails = 0, left = 0, any = 0;
+  for (int i = 0; i < ngroups; i++) {
+    int st = groups[i].status;
+    if (st == ST_FAIL) fails++;
+    if (st == ST_IDLE || st == ST_ASK || st == ST_RUN) left++;
+    if (st != ST_IDLE && st != ST_NA) any = 1;
+  }
+  if (auto_on) {
+    if (auto_loop) { p = str_cpy(p, "Loop "); p = fmt_u(p, (uint32_t) auto_rounds + 1); *p++ = ':'; *p++ = ' '; }
+    else p = str_cpy(p, "Auto: ");
+    p = str_cpy(p, auto_names[auto_k]); p = str_cpy(p, " ("); p = fmt_u(p, (uint32_t) auto_k + 1); p = str_cpy(p, " of ");
+    p = fmt_u(p, NAUTO); p = str_cpy(p, ")");
+    if (fails) { p = str_cpy(p, ", "); p = fmt_u(p, (uint32_t) fails); str_cpy(p, " FAIL"); }
+    color = fails ? C_FAIL : C_RUN;
+  } else if (fails) {
+    p = str_cpy(p, "BOARD FAULTY: "); p = fmt_u(p, (uint32_t) fails); str_cpy(p, fails == 1 ? " group fails" : " groups fail");
+    color = C_FAIL;
+  } else if (!any) str_cpy(p, "Not checked yet: A runs the automatic checks");
+  else if (left) { p = str_cpy(p, "No faults so far, "); p = fmt_u(p, (uint32_t) left); str_cpy(p, " to check by hand"); }
+  else { str_cpy(p, "BOARD OK: every group passes"); color = C_PASS; }
+  if (!auto_on && auto_rounds > 1) { p = t + str_len(t); p = str_cpy(p, " ("); p = fmt_u(p, (uint32_t) auto_rounds); str_cpy(p, " rounds)"); }
+  scr_text_n(24, VROW, t, COLS - 25, color, C_NONE);
 }
 
 static void draw_clock(void);
@@ -84,7 +195,9 @@ static void draw_main(void) {
   scr_text(COLS - 1 - (int) (p - t), 5, t, C_DIM, C_NONE);
   scr_uline(1, 6, COLS - 2, C_LINE);
   for (int i = 0; i < ngroups; i++) draw_group(i);
-  scr_text(1, ROWS - 1, "Arrows: select  Enter: open  Ctrl+Alt+Backspace: exit", C_FOOT, C_NONE);
+  draw_verdict();
+  scr_text(1, ROWS - 1, auto_on ? "Esc: stop the run  Ctrl+Alt+Backspace: exit" :
+           "Arrows: select  Enter: open  A: auto  L: loop  Ctrl+Alt+Backspace: exit", C_FOOT, C_NONE);
 }
 
 // the page: a window of 10 groups around the open one on the left, the check on the right
@@ -206,6 +319,10 @@ void app_init(void) {
       str_cpy(board_name, buf[8] == 1 ? "Go" : buf[8] == 2 ? "Mini" : buf[8] == 3 ? "Mini G" : "?");
     }
   }
+  if (board_name[0] != 'G') {   // the floppy port is on the Go only
+    group_t *f = &groups[group_index("Floppy")];
+    f->status = ST_NA; str_cpy(f->info, "Go only");
+  }
   scr_init();
   draw_main();
   draw_clock();
@@ -226,6 +343,14 @@ static void poll_mouse(void) {
   R_CURSOR = 0x80000000u | (uint32_t) my << 16 | (uint32_t) mx;
   if ((b & 1) && !(mbtn & 1) && open_g < 0) {
     int c = mx / CELL_W, r = my / CELL_H;
+    if (r == VROW && c >= 1 && c < 22) {
+      int loop = c >= 12;
+      if (auto_on) auto_stop(); else auto_start(loop);
+      draw_main();
+      mbtn = b;
+      return;
+    }
+    if (auto_on) { mbtn = b; return; }
     if (r >= 8 && (r - 8) % 2 == 0 && (r - 8) / 2 < PER_COL) {
       int i = (r - 8) / 2 + (c >= COL2 ? PER_COL : 0);
       if (i < ngroups && (c < 18 || (c >= COL2 && c < COL2 + 17))) { sel = i; open_page(i); }
@@ -241,12 +366,17 @@ void app_step(void) {
   poll_keys();
   poll_mouse();
   int k = next_key();
-  if (open_g < 0) {
+  if (open_g < 0 && auto_on) {
+    if (k == K_ESC) { auto_stop(); draw_main(); return; }
+    auto_step();
+    if (!auto_on) draw_main();
+  } else if (open_g < 0) {
     int old = sel;
     if (k == K_DOWN) sel = (sel + 1) % ngroups;
     else if (k == K_UP) sel = (sel + ngroups - 1) % ngroups;
     else if (k == K_RIGHT || k == K_LEFT) sel = sel < PER_COL ? (sel + PER_COL < ngroups ? sel + PER_COL : ngroups - 1) : sel - PER_COL;
     else if (k == K_ENTER) { open_page(sel); return; }
+    else if (k == K_A || k == K_L) { auto_start(k == K_L); draw_main(); return; }
     if (sel != old) { draw_group(old); draw_group(sel); }
   } else {
     group_t *g = &groups[open_g];

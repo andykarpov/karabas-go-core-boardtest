@@ -52,14 +52,21 @@ sw:
 $(ROMS):
 	$(MAKE) -C sw
 
+# content_hash(file, sources): file holds the sha256 of the sources, rewritten only when it changes
+content_hash = $(shell h=$$(cat $(2) | sha256sum | cut -d' ' -f1); [ "$$(cat $(1) 2>/dev/null)" = "$$h" ] || echo "$$h" > $(1))
+
 define board
 SRC_$(1) := $$(shell sed -n 's/^[a-z]* work "\(.*\)"/\1/p' karabas_$(1).prj)
 
-karabas_$(1).ngc: karabas_$(1).prj karabas_$(1).xst $$(SRC_$(1)) $(INCLUDES)
+# the sources by their content, not their time: a git checkout / pull rewrites unchanged files (a new mtime) and
+# must not start XST again. The hash file is rewritten (when make reads this file) only when the hash changes.
+$$(call content_hash,karabas_$(1).srchash,karabas_$(1).prj karabas_$(1).xst $$(SRC_$(1)) $(INCLUDES))
+$$(call content_hash,karabas_$(1).ucf.hash,karabas_$(1).ucf karabas_$(1).ut)
+karabas_$(1).ngc: karabas_$(1).srchash
 	mkdir -p xst/projnav.tmp
 	$(XIL) xst -intstyle ise -ifn karabas_$(1).xst -ofn karabas_$(1).syr
 
-karabas_$(1).bin: karabas_$(1).ngc karabas_$(1).ucf karabas_$(1).ut
+karabas_$(1).bin: karabas_$(1).ngc karabas_$(1).ucf.hash
 	$(XIL) ngdbuild -intstyle ise -dd _ngo -nt timestamp -uc karabas_$(1).ucf -p $(PART) karabas_$(1).ngc karabas_$(1).ngd
 	$(XIL) map -intstyle ise -p $(PART) -w $(MAP_OPT) -t $(MAP_T_$(1)) -o karabas_$(1)_map.ncd karabas_$(1).ngd karabas_$(1).pcf
 	$(XIL) par -w -intstyle ise $(PAR_OPT) karabas_$(1)_map.ncd karabas_$(1).ncd karabas_$(1).pcf
