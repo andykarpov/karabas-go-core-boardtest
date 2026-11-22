@@ -564,3 +564,9 @@ void sdram_key(group_t *g, int k) {
     sd_draw();
   }
 }
+
+// the auto run (main.c): the testers stop after the result (their pages loop until stopped)
+void mem_stop(void) {
+  sr.run = 0; sr.step = -1;
+  sd.run = 0; sd.ph = SP_STOP;
+}

@@ -33,8 +33,9 @@ void scr_init(void) {
   R_SHOW = 1;
 }
 
+int scr_mute;
 void scr_put(int c, int r, uint16_t tile, int fg, int bg) {
-  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
+  if (scr_mute || c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
   R_CELL(r * COLS + c) = CELL(tile, fg, bg);
 }
 

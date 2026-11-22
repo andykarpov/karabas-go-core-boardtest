@@ -14,6 +14,7 @@ enum {
 typedef struct { uint32_t bg, gradient, button, active, text, text_active, footer; } look_t;
 extern look_t look;
 
+extern int scr_mute;                // no drawing (a group runs in the background: its page is not shown)
 void scr_init(void);                 // the palette and the gradient from look, the screen cleared, shown
 void scr_clear(void);
 void scr_put(int c, int r, uint16_t tile, int fg, int bg);

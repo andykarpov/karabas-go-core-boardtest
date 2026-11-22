@@ -329,6 +329,32 @@ int main(int argc, char **argv) {
     run(100);
     fprintf(stderr, "%s: [%s]\n", sc, groups[i].info);
   }
+  else if (!strcmp(sc, "auto") || !strcmp(sc, "auto_run")) {
+    sr_reset(0, 3, 7); sd_reset(0, 5);
+    press(K_A);
+    int sd = find("SDRAM"), sr = find("SRAM");
+    for (int n = 0; n < 400000; n++) {
+      run(1);
+      if (!strcmp(sc, "auto_run") && groups[sr].status == ST_RUN) { run(3); break; }
+      if (strcmp(sc, "auto_run") && n > 1000 && groups[sd].status != ST_RUN && groups[sd].status != ST_IDLE) break;
+    }
+    if (strcmp(sc, "auto_run")) run(200);
+    for (int i = 0; i < ngroups; i++) fprintf(stderr, "%s: %s %d [%s]\n", sc, groups[i].name, groups[i].status, groups[i].info);
+  }
+  else if (!strcmp(sc, "loop")) {   // two rounds and a half with a bad SDRAM line, then Esc
+    sr_reset(0, 3, 7); sd_reset(1, 5);
+    press(K_L);
+    int sd = find("SDRAM"), rounds = 0, was = 0;
+    for (int n = 0; n < 2000000 && rounds < 2; n++) {
+      run(1);
+      int now = groups[sd].status == ST_RUN;
+      if (was && !now) rounds++;
+      was = now;
+    }
+    run(500);
+    press(K_ESC);
+    fprintf(stderr, "loop: SDRAM %d [%s]\n", groups[sd].status, groups[sd].info);
+  }
   else if (!strcmp(sc, "input_esc")) {
     // a short Esc stays on the page, a held one (over a second) leaves it
     int i = find("Input");

@@ -7,7 +7,7 @@ enum { ST_IDLE, ST_RUN, ST_ASK, ST_PASS, ST_FAIL, ST_NA, ST_NA_FW };
 
 // USB HID usage codes of the keys the pages use
 enum { K_ENTER = 0x28, K_ESC = 0x29, K_BKSP = 0x2a, K_SPACE = 0x2c, K_RIGHT = 0x4f, K_LEFT = 0x50, K_DOWN = 0x51,
-       K_UP = 0x52, K_Y = 0x1c, K_N = 0x11, K_R = 0x15 };
+       K_UP = 0x52, K_Y = 0x1c, K_N = 0x11, K_R = 0x15, K_A = 0x04, K_L = 0x0f };
 
 typedef struct group group_t;
 struct group {
@@ -46,6 +46,7 @@ void sdram_open(group_t *g);
 void sdram_tick(group_t *g);
 void sdram_key(group_t *g, int k);
 const char *sdram_diag(void);
+void mem_stop(void);            // the auto run: the SRAM / SDRAM testers stop
 
 // the storage and the modules (per.c)
 void sd_open(group_t *g);
