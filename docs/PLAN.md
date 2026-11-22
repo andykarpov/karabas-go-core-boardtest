@@ -210,6 +210,15 @@ ESP32 — ZiFi32 GET_VER и GET_INFO_STR (сборка). Записей на н�
 - Релиз в `karabas-go`: `boardtest.kg` в `cores.json`; убрать ли `cores/test.kg` и архивировать
   старые test / sdram-test — спросить.
 
+**Состояние Ф5 (ветка `phase/f5`, сборка 26112211):** верхи Go и Mini сделаны из верха Mini G (различия как в меню):
+Go — VGA через видео-ЦАП (V_CLK = инверсный clk_sys из ODDR2), PCM5102 с LRCK / MUTE, без ADC (петли звука и MIDI
+через ADC — вопрос оператору), BEEPER = квадрат TAPE_OUT, MIDI_CLK 12,16 МГц, FT812 только SPI (FT_OE_N = 1), SD2 по
+SCK kg_mcu2, порт дисковода (выходы 0 в покое); Mini — HDMI как Mini G, сигма-дельта AUDIO_L / R, FT_RESET, MIDI_CLK
+12,16 МГц (PLL /37), MCU_SCK не на тактовом выводе. Страница Floppy (Go, только чтение): мотор A, обороты по INDEX, поиск
+дорожки 0 шагами, WPRT, поток RDATA. README en / ru. Релиз (пользователь 2026-11-22): `boardtest.kg` в `cores.json`
+karabas-go, `test.kg` и `sdrtest.kg` убрать, репо test / sdram-test архивировать после слияния релиза. Go и Mini на платах
+не проверены (их нет на стенде).
+
 ## Открытые вопросы
 
 См. `docs/BACKLOG.md`.

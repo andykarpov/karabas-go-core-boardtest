@@ -100,3 +100,10 @@ uint32_t host_rd(uint32_t off);
 #define PE_OWN_SD   8u
 #define PE_OWN_FT   16u
 #define PE_HALF(h)  ((uint32_t) (h) << 8)
+#define PE_FDD      0xb30       // W: bits 1:0 drive selects, 2 motor, 3 DIR (1 = in), 4 STEP, 5 side 1 (pins high = active);
+                                // R: bit 0 INDEX, 1 TR00, 2 WPRT, 3 RDATA, bits 31:8 the INDEX pulses
+#define PE_FDD_FLUX 0xb34       // R: the RDATA pulses
+#define FD_A        1u
+#define FD_MOTOR    4u
+#define FD_IN       8u
+#define FD_STEP     16u

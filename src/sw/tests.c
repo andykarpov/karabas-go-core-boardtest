@@ -72,7 +72,7 @@ static void fpga_open(group_t *g) {
   page_row(2, "Firmware", fw_build, C_TEXT);
   page_row(3, "MCU link", rpc_enabled() ? "link v2, RPC up" : "no RPC (old firmware?)", rpc_enabled() ? C_TEXT : C_FAIL);
   page_row(4, "CPU", "VexRiscv rv32im 75 MHz, 56 KB block RAM", C_TEXT);
-  page_row(5, "Video", (IO_BTN >> 8) & 1 ? "DVI (no audio), 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
+  page_row(5, "Video", board_name[0] == 'G' ? "VGA, 800 x 600 60 Hz" : (IO_BTN >> 8) & 1 ? "DVI (no audio), 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
   int ok = (hi >> 31) && rpc_enabled();
   p = str_cpy(t, "DNA "); fmt_hex(p, lo, 8);
   set_status(g, ok ? ST_PASS : ST_FAIL, ok ? t : "no DNA / RPC");
@@ -247,7 +247,7 @@ static void aud_open(group_t *g) {
   g->v[4] = 0;
   aud_set(0);
   page_row(0, "Tone", "1 kHz sine: left 1.5 s, then right 1.5 s", C_TEXT);
-  page_row(1, "Output", (IO_BTN >> 8) & 1 ? "the DAC (DVI: no audio on HDMI)" : "the DAC and HDMI", C_TEXT);
+  page_row(1, "Output", board_name[0] == 'G' ? "the DAC (the Go has no line in: no loop back)" : (IO_BTN >> 8) & 1 ? "the DAC (DVI: no audio on HDMI)" : "the DAC and HDMI", C_TEXT);
   page_hint("A cable from the DAC out to the line in: the ADC measures the tones too");
   ask(g, "Did you hear it on the left, then on the right?");
 }
@@ -381,7 +381,7 @@ static void vid_open(group_t *g) {
     return;
   }
   g->v[0] = 0;
-  page_row(0, "Output", (IO_BTN >> 8) & 1 ? "DVI, 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
+  page_row(0, "Output", board_name[0] == 'G' ? "VGA, 800 x 600 60 Hz" : (IO_BTN >> 8) & 1 ? "DVI, 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
   page_row(1, "Pictures", "colour bars, then ramps of white, red, green, blue", C_TEXT);
   page_row(3, "", "Enter: the pictures (any key: the next one)", C_TEXT_A);
   set_status(g, ST_RUN, 0);
@@ -523,6 +523,6 @@ group_t groups[] = {
   { "Input", in_open, in_tick, 0, 0, ST_IDLE, "", {0} },
   { "Buttons / LEDs", btn_open, btn_tick, btn_key, btn_close, ST_IDLE, "", {0} },
   { "LED matrix", mx_open, mx_tick, mx_key, mx_close, ST_IDLE, "", {0} },
-  { "Floppy", later_open, 0, 0, 0, ST_IDLE, "", {0} },
+  { "Floppy", fdd_open, fdd_tick, 0, fdd_close, ST_IDLE, "", {0} },
 };
 const int ngroups = sizeof(groups) / sizeof(groups[0]);

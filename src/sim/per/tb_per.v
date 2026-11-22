@@ -26,7 +26,7 @@ bt_per #(.CLKS_PER_BIT(16)) dut (
 	.ft_cs_n(ft_cs_n), .esp32_cs_n(esp32_cs_n), .sd_miso(miso), .ft_miso(miso), .sd_det_n(1'b0), .ft_int_n(1'b1),
 	.uart_rx(uart_tx), .uart_tx(uart_tx), .uart_cts(uart_cts),
 	.ide_a(ide_a), .ide_cs_n(ide_cs_n), .ide_rd_n(ide_rd_n), .ide_wr_n(ide_wr_n), .ide_rst_n(ide_rst_n),
-	.ide_d_i(ide_di), .ide_d_o(ide_do), .ide_d_oe(ide_oe)
+	.ide_d_i(ide_di), .ide_d_o(ide_do), .ide_d_oe(ide_oe), .fdd_out(), .fdd_in(4'd0)
 );
 
 // ---- the SPI slave: shifts MOSI in on the rising edge, the answer out on the falling one

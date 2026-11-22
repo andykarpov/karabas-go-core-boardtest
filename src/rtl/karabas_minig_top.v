@@ -384,7 +384,7 @@ bt_per #(.CLKS_PER_BIT(651)) per (
     .sd_det_n(SD_DET_N), .ft_int_n(FT_INT_N),
     .uart_rx(UART_RX), .uart_tx(UART_TX), .uart_cts(UART_CTS),
     .ide_a(WA), .ide_cs_n(WCS_N), .ide_rd_n(WRD_N), .ide_wr_n(WWR_N), .ide_rst_n(WRESET_N), .ide_d_i(WD),
-    .ide_d_o(ide_do), .ide_d_oe(ide_oe)
+    .ide_d_o(ide_do), .ide_d_oe(ide_oe), .fdd_out(), .fdd_in(4'd0)
 );
 assign WD = ide_oe ? ide_do : 16'hzzzz;
 

@@ -55,3 +55,6 @@ void ft_open(group_t *g);
 void wifi_open(group_t *g);
 void wifi_tick(group_t *g);
 void wifi_close(group_t *g);
+void fdd_open(group_t *g);
+void fdd_tick(group_t *g);
+void fdd_close(group_t *g);

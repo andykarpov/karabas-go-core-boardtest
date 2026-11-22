@@ -169,6 +169,19 @@ static void ide_go(uint32_t v) {
   ide_q = tf[reg];
 }
 
+// ---- the floppy drive A (Go): 300 rpm, the head on track 17, 250k flux pulses / s
+static uint32_t fdd_ctl;
+static int head = 17;
+static void fdd_wr(uint32_t v) {
+  if ((v & 16) && !(fdd_ctl & 16) && (v & 1)) { head += (v & 8) ? 1 : -1; if (head < 0) head = 0; }
+  fdd_ctl = v;
+}
+static uint32_t fdd_rd(void) {
+  uint32_t on = (fdd_ctl & 5) == 5, t = host_ms();
+  uint32_t idx = on ? t / 200 : 0;
+  return idx << 8 | ((fdd_ctl & 1) && head == 0 ? 2u : 0u) | (on && t % 200 < 4 ? 1u : 0u);
+}
+
 // ---- the registers
 int per_wr(uint32_t off, uint32_t v) {
   if (off < 0xb00 || off >= 0xb40) return 0;
@@ -181,6 +194,7 @@ int per_wr(uint32_t off, uint32_t v) {
       break;
     case PE_UART_CTL: cts_held = v & 1; if (v & 2) rxh = rxt = 0; break;
     case PE_IDE_GO: ide_go(v); break;
+    case PE_FDD: fdd_wr(v); break;
   }
   return 1;
 }
@@ -194,6 +208,8 @@ int per_rd(uint32_t off, uint32_t *v) {
     case PE_UART_CTL: *v = cts_held ? 0 : (uint32_t) (rxt - rxh); break;
     case PE_IDE_GO: *v = 0; break;
     case PE_IDE_DATA: *v = ide_q; break;
+    case PE_FDD: *v = fdd_rd(); break;
+    case PE_FDD_FLUX: *v = (fdd_ctl & 5) == 5 ? host_ms() * 250u : 0; break;
     default: *v = 0;
   }
   return 1;
