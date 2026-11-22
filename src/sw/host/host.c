@@ -15,6 +15,7 @@
 void app_init(void);
 void app_step(void);
 void app_open(int i);
+int app_page(void);
 
 static uint32_t regs[0x14000 / 4];
 static uint32_t ms, kbdn, tape_edges, zc_l, zc_r;
@@ -123,6 +124,15 @@ int main(int argc, char **argv) {
     keys(0x2C060500u); keys(0x2C060502u); run(200);                                           // B, C, Space with LShift
     regs[0x34 / 4] = (1u << 24) | (12u << 12) | 30u; run(50);
     regs[0x38 / 4] = 0x00410003u; run(200);                                                // joy L on + up + A, R on
+  }
+  else if (!strcmp(sc, "input_esc")) {
+    // a short Esc stays on the page, a held one (over a second) leaves it
+    int i = find("Input");
+    app_open(i);
+    press(K_ESC); run(2000);
+    fprintf(stderr, "input_esc: after a short Esc the page is %s\n", app_page() == i ? "open" : "left");
+    keys((uint32_t) K_ESC << 8); run(1500); keys(0); run(50);
+    fprintf(stderr, "input_esc: after a held Esc the page is %s\n", app_page() == i ? "open" : "left");
   }
   regs[0x44 / 4] = 0;   // no cursor in the frames
   dump(argv[2]);

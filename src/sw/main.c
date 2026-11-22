@@ -40,6 +40,7 @@ static void load_look(void) {
 static int sel;          // the group chosen
 static int open_g = -1;  // the page shown, -1 the main screen
 char board_name[8] = "?", fw_build[9] = "?";
+int fullscreen;          // a page shows a picture over the whole screen (no clock)
 
 static const char *st_text(int st) {
   switch (st) {
@@ -145,7 +146,7 @@ static void close_page(void) {
 static void draw_clock(void) {
   uint8_t tm[8];
   uint16_t n;
-  if (!rpc_enabled() || rpc_call(RPC_SYS, 1, 0, 0, tm, sizeof(tm), &n, 500) != RPC_OK || n < 7) return;
+  if (fullscreen || !rpc_enabled() || rpc_call(RPC_SYS, 1, 0, 0, tm, sizeof(tm), &n, 500) != RPC_OK || n < 7) return;
   char t[12], *p = t;
   p = fmt_u2(p, tm[4]); *p++ = ':'; p = fmt_u2(p, tm[5]); *p++ = ':'; fmt_u2(p, tm[6]);
   scr_big(COLS - 17, 0, t, C_TEXT);
@@ -234,6 +235,7 @@ static void poll_mouse(void) {
 }
 
 void app_open(int i) { sel = i; open_page(i); }   // the host build
+int app_page(void) { return open_g; }
 
 void app_step(void) {
   poll_keys();

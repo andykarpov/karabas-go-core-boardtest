@@ -117,7 +117,7 @@ static void rtc_tick(group_t *g) {
   if (ok && !sane) page_row(3, "", "the date is not set (or the battery is flat)", C_FAIL);
   int pass = ok && tick && sane && g->v[3] != 0;
   set_status(g, pass ? ST_PASS : ST_FAIL, !ok ? "no RTC" : !tick ? "RTC stopped" : !sane ? "date not set" :
-             g->v[3] == 0 ? "no EEPROM" : g->v[3] < 0 ? "RTC ok, EE n/a" : "RTC, 24C08");
+             g->v[3] == 0 ? "no EEPROM" : g->v[3] < 0 ? "RTC, EE n/a" : "RTC, 24C08");
 }
 
 // ---------------------------------------------------------------- Buttons / LEDs
@@ -359,6 +359,7 @@ static void midi_close(group_t *g) {
 // ---------------------------------------------------------------- Video
 
 void page_redraw(void);
+extern int fullscreen;
 
 static const uint32_t bars[8] = { 0xFFFFFF, 0xFFFF00, 0x00FFFF, 0x00FF00, 0xFF00FF, 0xFF0000, 0x0000FF, 0x000000 };
 static const uint32_t ramps[4] = { 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF };
@@ -393,16 +394,16 @@ static void vid_key(group_t *g, int k) {
     set_status(g, k == K_Y ? ST_PASS : ST_FAIL, k == K_Y ? "bars, ramps ok" : "picture wrong");
     return;
   }
-  if (g->v[0] == 0 && k == K_ENTER) { g->v[0] = 1; g->v[1] = 0; g->v[7] = 1; vid_picture(0); return; }
+  if (g->v[0] == 0 && k == K_ENTER) { g->v[0] = 1; g->v[1] = 0; g->v[7] = 1; fullscreen = 1; vid_picture(0); return; }
   if (g->v[0] == 1) {
     if (++g->v[1] < 5) { vid_picture(g->v[1]); return; }
-    g->v[0] = 2; g->v[7] = 0;
+    g->v[0] = 2; g->v[7] = 0; fullscreen = 0;
     scr_init();                 // the palette and the gradient of the look again
     page_redraw();
   }
 }
 
-static void vid_close(group_t *g) { if (g->v[0] == 1) { g->v[0] = 0; scr_init(); } }
+static void vid_close(group_t *g) { if (g->v[0] == 1) { g->v[0] = 0; fullscreen = 0; scr_init(); } }
 
 // ---------------------------------------------------------------- Input
 
@@ -450,8 +451,15 @@ static void in_tick(group_t *g) {
     int c = PX + 10;
     for (int i = 0; i < 8; i++) c = scr_text(c, PROW + 1, mods[i], (k0 >> i) & 1 ? C_PASS : C_IDLE, C_NONE) + 1;
     scr_text(PX, PROW + 1, "Modifiers", C_DIM, C_NONE);
-    // Esc held: leave after a second
-    if (key_held(K_ESC)) g->v[6] = (int32_t) now_ms(); else g->v[6] = 0;
+  }
+  // Esc held a second leaves the page: the keyboard register itself each time (a release does not always come
+  // with a new report count)
+  {
+    uint32_t e0 = R_KBD0, e1 = R_KBD1, c = K_ESC;
+    int esc = ((e0 >> 8) & 0xFF) == c || ((e0 >> 16) & 0xFF) == c || (e0 >> 24) == c ||
+              (e1 & 0xFF) == c || ((e1 >> 8) & 0xFF) == c || ((e1 >> 16) & 0xFF) == c;
+    if (!esc) g->v[6] = 0;
+    else if (!g->v[6]) g->v[6] = (int32_t) (now_ms() | 1);
   }
   if (g->v[6] && now_ms() - (uint32_t) g->v[6] >= 1000) {
     g->v[6] = 0;
