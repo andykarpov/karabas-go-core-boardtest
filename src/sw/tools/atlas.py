@@ -13,7 +13,8 @@ gradient. The atlas holds:
 - shapes (anti-aliased): solid, rounded ends of buttons, panel corners and edges, lines, meter
   fills, marks;
 - the mono logo of the Mini (assets/logo_mini_56x16.bin = firmware ui2.c logo_full with the m and
-  n of the colour logo, firmware PR #165), x4 = 224 x 64, cut into tiles (deduplicated).
+  n of the colour logo, firmware PR #165), x4 = 224 x 64, cut into tiles (deduplicated); "logo_go" is
+  the same without the word "mini" (the box 13 x 5 at 26, 11 that firmware ui2_logo clears on a Go).
 
 The font, the digits and the logo are 1 bit (coverage 0 or 15), only the shapes use the 16 levels.
 
@@ -30,9 +31,13 @@ BIG_CHARS = "0123456789:/ "  # the clock and the date only
 SS = 4  # supersampling of the shapes
 
 
-def logo_bits():
+def logo_bits(go=False):
     b = open(os.path.join(ASSETS, "logo_mini_56x16.bin"), "rb").read()
-    return [[(b[y * 7 + x // 8] >> (7 - x % 8)) & 1 for x in range(56)] for y in range(16)]
+    bits = [[(b[y * 7 + x // 8] >> (7 - x % 8)) & 1 for x in range(56)] for y in range(16)]
+    if go:  # no "mini" on a Go (firmware ui2_logo)
+        for y in range(11, 16):
+            for x in range(26, 39): bits[y][x] = 0
+    return bits
 
 
 def osd_font():
@@ -49,7 +54,8 @@ class Atlas:
         self.add("solid", bytes([15]) * (cw * ch))
         self._osd_font()
         self._shapes()
-        self._logo(logo_xy, logo_scale)
+        self._logo(logo_xy, logo_scale, "logo")
+        self._logo(logo_xy, logo_scale, "logo_go")
 
     # a tile from an L image (0..255) of cw x ch, deduplicated
     def add(self, name, data):
@@ -126,8 +132,8 @@ class Atlas:
         self._shape("cross", lambda d, w, h: (d.line(((w * .15, cy - rr), (w * .85, cy + rr)), fill=255, width=2 * SS),
                                              d.line(((w * .15, cy + rr), (w * .85, cy - rr)), fill=255, width=2 * SS)))
 
-    def _logo(self, xy, scale):
-        bits = logo_bits()
+    def _logo(self, xy, scale, name):
+        bits = logo_bits(name == "logo_go")
         lw, lh = 56 * scale, 16 * scale
         cols = (xy[0] + lw + self.cw - 1) // self.cw
         rows = (xy[1] + lh + self.ch - 1) // self.ch
@@ -140,7 +146,7 @@ class Atlas:
         for r in range(rows):
             for c in range(cols):
                 idx.append(self.add(None, img.crop((c * self.cw, r * self.ch, (c + 1) * self.cw, (r + 1) * self.ch))))
-        self.id["logo"] = (cols, rows, idx)
+        self.id[name] = (cols, rows, idx)
 
     def bytes_used(self):
         return len(self.tiles) * self.cw * self.ch // 2

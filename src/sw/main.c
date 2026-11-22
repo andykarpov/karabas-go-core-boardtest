@@ -183,7 +183,7 @@ static void draw_verdict(void) {
 static void draw_clock(void);
 static void draw_header(void) {
   scr_clear();
-  scr_logo(0, 0, C_LOGO);
+  scr_logo(0, 0, C_LOGO, board_name[0] == 'G');   // "Go"
   draw_clock();
 }
 

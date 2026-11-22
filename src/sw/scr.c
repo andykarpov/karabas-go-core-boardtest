@@ -98,7 +98,8 @@ void scr_meter(int c, int r, int w, int permille, int fg) {
   }
 }
 
-void scr_logo(int c, int r, int fg) {
+void scr_logo(int c, int r, int fg, int go) {
+  const uint16_t *t = go ? t_logo_go : t_logo;   // the Go: no "mini"
   for (int y = 0; y < LOGO_ROWS; y++)
-    for (int x = 0; x < LOGO_COLS; x++) scr_put(c + x, r + y, t_logo[y * LOGO_COLS + x], fg, C_NONE);
+    for (int x = 0; x < LOGO_COLS; x++) scr_put(c + x, r + y, t[y * LOGO_COLS + x], fg, C_NONE);
 }

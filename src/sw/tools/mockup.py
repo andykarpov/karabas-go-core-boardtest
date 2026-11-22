@@ -78,8 +78,8 @@ class Screen:
         for i in range(w):
             self.put(c + i, r, f"bar{max(0, min(self.a.cw, n - i * self.a.cw))}", fg)
 
-    def logo(self, c, r, fg="logo"):
-        cols, rows, idx = self.a.id["logo"]
+    def logo(self, c, r, fg="logo", go=False):
+        cols, rows, idx = self.a.id["logo_go" if go else "logo"]
         for y in range(rows):
             for x in range(cols):
                 self.put(c + x, r + y, idx[y * cols + x], fg)

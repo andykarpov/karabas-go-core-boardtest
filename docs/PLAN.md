@@ -223,6 +223,10 @@ karabas-go, `test.kg` и `sdrtest.kg` убрать, репо test / sdram-test �
 (#53, `cores/boardtest.kg` синхронизирован, eb8538c); `test.kg` и `sdrtest.kg` удалены, репо `karabas-go-core-test` и
 `karabas-go-core-sdram-test` в архиве. Открыто: Go и Mini на платах, бэклог.
 
+**Сборка 26112301 (2026-11-23, только программа CPU, битстримы те же):** логотип Go без слова «mini» (как
+`ui2_logo` прошивки, выбор по HW_ID из `SYS INFO`); на Go страница RTC / EEPROM проверяет расширитель PCA9536 (0x41):
+не отвечает — FAIL «no PCA9536», «кнопки и LED платы не работают» (пользователь 2026-11-22: на его Go чип не отвечает).
+
 ## Открытые вопросы
 
 См. `docs/BACKLOG.md`.

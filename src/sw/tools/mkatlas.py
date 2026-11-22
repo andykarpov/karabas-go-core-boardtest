@@ -56,10 +56,12 @@ def main(out1, out4, out_h):
     cols, rows, idx = a.id["logo"]
     h.append(f"#define LOGO_COLS {cols}")
     h.append(f"#define LOGO_ROWS {rows}")
-    h.append(f"static const uint16_t t_logo[{cols * rows}] = {{")
-    for r in range(rows):
-        h.append("  " + ", ".join(f"0x{code[i]:03x}" for i in idx[r * cols:(r + 1) * cols]) + ",")
-    h.append("};")
+    for name in ("logo", "logo_go"):
+        idx = a.id[name][2]
+        h.append(f"static const uint16_t t_{name}[{cols * rows}] = {{")
+        for r in range(rows):
+            h.append("  " + ", ".join(f"0x{code[i]:03x}" for i in idx[r * cols:(r + 1) * cols]) + ",")
+        h.append("};")
     open(out_h, "w").write("\n".join(h) + "\n")
     print(f"atlas: {len(t1)} 1-bit tiles ({len(b1)} bytes), {len(t4)} 4-bit tiles ({len(b4)} bytes)", file=sys.stderr)
 

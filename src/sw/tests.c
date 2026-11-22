@@ -95,11 +95,18 @@ static void rtc_open(group_t *g) {
   g->v[3] = st == RPC_OK ? (i2c_has(rbuf, 0x50) ? 1 : 0) : -1;   // the EEPROM: 1 found, 0 not, -1 firmware
   page_row(4, "EEPROM", g->v[3] > 0 ? "24C08 at 0x50" : g->v[3] == 0 ? "not found at 0x50" :
            "N/A: the firmware has no I2C_SCAN (PR #166)", g->v[3] == 0 ? C_FAIL : g->v[3] > 0 ? C_TEXT : C_DIM);
+  // the Go: the expander PCA9536 at 0x41 drives the buttons and the LEDs of the board (user 2026-11-22: a dead
+  // chip on a Go, the firmware only says "PCA9536 unavailable")
+  int go = board_name[0] == 'G';
+  g->v[4] = go && st == RPC_OK ? i2c_has(rbuf, 0x41) : -1;   // 1 found, 0 not, -1 not a Go / firmware
+  if (go) page_row(5, "Expander", g->v[4] > 0 ? "PCA9536 at 0x41" : g->v[4] == 0 ? "PCA9536 not answering at 0x41" :
+                   "N/A: the firmware has no I2C_SCAN (PR #166)", g->v[4] == 0 ? C_FAIL : g->v[4] > 0 ? C_TEXT : C_DIM);
+  if (g->v[4] == 0) page_row(6, "", "the buttons and LEDs of the board do not work", C_FAIL);
   if (st == RPC_OK) {
     char *p = t;
     for (int a = 8; a < 0x78 && p < t + 60; a++) if (i2c_has(rbuf, a)) { p = fmt_hex(p, (uint32_t) a, 2); *p++ = ' '; }
     *p = 0;
-    page_row(5, "I2C", t[0] ? t : "nothing answers", C_TEXT);
+    page_row(!go ? 5 : g->v[4] == 0 ? 7 : 6, "I2C", t[0] ? t : "nothing answers", C_TEXT);
   }
   set_status(g, ST_RUN, 0);
 }
@@ -115,9 +122,9 @@ static void rtc_tick(group_t *g) {
   page_row(2, "Ticking", !ok ? "-" : tick ? "yes" : "no: the seconds stand still", tick ? C_TEXT : C_FAIL);
   if (ok) { fmt_time(t, tm1); page_row(1, "Time", t, sane ? C_TEXT : C_FAIL); }
   if (ok && !sane) page_row(3, "", "the date is not set (or the battery is flat)", C_FAIL);
-  int pass = ok && tick && sane && g->v[3] != 0;
+  int pass = ok && tick && sane && g->v[3] != 0 && g->v[4] != 0;
   set_status(g, pass ? ST_PASS : ST_FAIL, !ok ? "no RTC" : !tick ? "RTC stopped" : !sane ? "date not set" :
-             g->v[3] == 0 ? "no EEPROM" : g->v[3] < 0 ? "RTC, EE n/a" : "RTC, 24C08");
+             g->v[3] == 0 ? "no EEPROM" : g->v[4] == 0 ? "no PCA9536" : g->v[3] < 0 ? "RTC, EE n/a" : "RTC, 24C08");
 }
 
 // ---------------------------------------------------------------- Buttons / LEDs
