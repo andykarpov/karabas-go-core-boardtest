@@ -60,6 +60,7 @@ class Screen:
         self.fill(c + 1, r, w - 2, color)
         # with a status column (dot is not False) the text keeps off the first inner cell
         c0, n = (c + 2, w - 3) if dot is not False else (c + 1, w - 2)
+        s = s[:n - (0 if align == "center" else 1)]
         x = c0 + ((n - len(s)) // 2 if align == "center" else 1)
         self.text(x, r, s, fg, color)
         if dot:  # the status on the button, as the bullet of the Setup sections of the boot menu
@@ -108,13 +109,14 @@ class Screen:
         return img
 
 
-GROUPS = [("FPGA / MCU", "pass", "DNA 0x0123456789ABCDE"), ("SRAM", "fail", "MD7 open"),
-          ("SDRAM", "pass", "166 MHz, 0 errors"), ("SPI flash", "na", "not fitted"),
+GROUPS = [("FPGA / MCU", "pass", "DNA 0x012345"), ("SRAM", "fail", "MD7 open"),
+          ("SDRAM", "pass", "166 MHz"), ("SPI flash", "na", "not fitted"),
           ("SD cards", "pass", "SD2 7.4 GB"), ("CF / IDE", "idle", "no card"),
-          ("FT812", "pass", "ID 7C"), ("Wi-Fi", "pass", "ESP8266 AT 1.7.4"),
+          ("FT812", "pass", "ID 7C"), ("Wi-Fi", "pass", "AT 1.7.4"), ("RTC / EEPROM", "pass", "24C08"),
           ("Audio", "run", "L / R tones"), ("Tape", "idle", "not run"),
           ("MIDI", "idle", "not run"), ("Video", "pass", "HDMI 800x600"),
-          ("Input", "pass", "kbd, mouse, 2 pads"), ("Floppy", "idle", "Go only")]
+          ("Input", "pass", "kbd, mouse"), ("Buttons / LEDs", "idle", "not run"),
+          ("LED matrix", "idle", "not run"), ("Floppy", "idle", "Go only")]
 STATUS = {"pass": "PASS", "fail": "FAIL", "run": "RUN", "idle": "--", "na": "N/A"}
 
 
@@ -131,14 +133,11 @@ def main_screen(a):
     s.text(1, 5, "Karabas Board Test", "text_a")
     s.text(s.cols - 1 - len("Mini G  fw 26112119"), 5, "Mini G  fw 26112119", "dim")
     s.uline(1, 5 + 1, s.cols - 2)
-    half = (s.cols - 3) // 2
     for i, (name, st, info) in enumerate(GROUPS):
-        col, row = (1 if i < 7 else 2 + half), 8 + 2 * (i % 7)
-        sel = i == 1
-        s.button(col, row, 14, name, "active" if sel else "button", "text_a", "left")
-        stxt = STATUS[st]
-        s.pill(col + 15, row, f"{stxt:^4}", st)
-        s.text(col + 22, row, info[:half - 23], "dim")
+        col, row = (1 if i < 9 else 40), 8 + 2 * (i % 9)
+        s.button(col, row, 17, name, "active" if i == 1 else "button", "text_a", "left")
+        s.pill(col + 18, row, f"{STATUS[st]:^4}", st)
+        s.text(col + 25, row, info[:13 + (col != 1)], "dim")
     s.text(1, s.rows - 2, "SRAM: data line MD7 does not toggle (stuck at 1)", "foot")
     s.text(1, s.rows - 1, "Arrows: select  Enter: open  R: run all  Ctrl+Alt+Backspace: exit", "foot")
     return s

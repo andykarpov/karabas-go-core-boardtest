@@ -31,21 +31,24 @@ static void load_look(void) {
   }
 }
 
+// the groups of checks (user 2026-11-22: 17 in two columns of 9)
 static const struct { const char *name; int na; } groups[] = {
   { "FPGA / MCU", 0 }, { "SRAM", 0 }, { "SDRAM", 0 }, { "SPI flash", 1 }, { "SD cards", 0 }, { "CF / IDE", 0 },
-  { "FT812", 0 }, { "Wi-Fi", 0 }, { "Audio", 0 }, { "Tape", 0 }, { "MIDI", 0 }, { "Video", 0 }, { "Input", 0 },
-  { "Floppy", 0 },
+  { "FT812", 0 }, { "Wi-Fi", 0 }, { "RTC / EEPROM", 0 },
+  { "Audio", 0 }, { "Tape", 0 }, { "MIDI", 0 }, { "Video", 0 }, { "Input", 0 }, { "Buttons / LEDs", 0 },
+  { "LED matrix", 0 }, { "Floppy", 0 },
 };
 #define NGROUPS ((int) (sizeof(groups) / sizeof(groups[0])))
-#define HALF 38
+#define PER_COL 9
+#define COL2 40
 
 static int sel;
 
 static void draw_group(int i) {
-  int col = i < 7 ? 1 : 2 + HALF, row = 8 + 2 * (i % 7);
-  scr_button(col, row, 14, groups[i].name, i == sel ? C_ACTIVE : C_BUTTON, C_TEXT_A, 1, -2);
-  scr_pill(col + 15, row, groups[i].na ? "N/A " : " -- ", C_IDLE);
-  scr_text_n(col + 22, row, groups[i].na ? "not fitted" : "not run", HALF - 23, C_DIM, C_NONE);
+  int col = i < PER_COL ? 1 : COL2, row = 8 + 2 * (i % PER_COL);
+  scr_button(col, row, 17, groups[i].name, i == sel ? C_ACTIVE : C_BUTTON, C_TEXT_A, 1, -2);
+  scr_pill(col + 18, row, groups[i].na ? "N/A " : " -- ", C_IDLE);
+  scr_text_n(col + 25, row, groups[i].na ? "not fitted" : "not run", COL2 - 2 - 25 + (col == 1 ? 0 : 1), C_DIM, C_NONE);
 }
 
 static void draw_main(const char *board, const char *fw) {
@@ -126,7 +129,8 @@ int main(void) {
       if (key_pressed(k0, k1, 0x51) && !key_pressed(kbd0, kbd1, 0x51)) sel = (sel + 1) % NGROUPS;
       if (key_pressed(k0, k1, 0x52) && !key_pressed(kbd0, kbd1, 0x52)) sel = (sel + NGROUPS - 1) % NGROUPS;
       if ((key_pressed(k0, k1, 0x4F) && !key_pressed(kbd0, kbd1, 0x4F)) ||
-          (key_pressed(k0, k1, 0x50) && !key_pressed(kbd0, kbd1, 0x50))) sel = (sel + 7) % 14;
+          (key_pressed(k0, k1, 0x50) && !key_pressed(kbd0, kbd1, 0x50)))
+        sel = sel < PER_COL ? (sel + PER_COL < NGROUPS ? sel + PER_COL : NGROUPS - 1) : sel - PER_COL;
       if (sel != old) { draw_group(old); draw_group(sel); }
       kbd0 = k0; kbd1 = k1;
     }

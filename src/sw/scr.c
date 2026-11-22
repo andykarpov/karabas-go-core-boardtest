@@ -74,7 +74,7 @@ void scr_button(int c, int r, int w, const char *s, int color, int fg, int left,
   scr_fill(c + 1, r, w - 2, color);
   int c0 = dot != -2 ? c + 2 : c + 1, n = dot != -2 ? w - 3 : w - 2;
   int len = str_len(s);
-  if (len > n) len = n;
+  if (len > n - (left ? 1 : 0)) len = n - (left ? 1 : 0);
   int x = c0 + (left ? 1 : (n - len) / 2);
   scr_text_n(x, r, s, len, fg, color);
   if (dot >= 0) scr_put(c + 1, r, T_SDOT, dot, color);

@@ -8,7 +8,8 @@ gradient. The atlas holds:
 
 - the font: the 8 x 8 font of the firmware OSD (CP866, assets/osd_font_866.bin), each row twice
   (8 x 16), centred in the cell, ASCII 32..126 (user 2026-11-22: rather than Noto Sans Mono);
-- the big digits of the clock: the same x2 again (16 x 32), 2 x 2 tiles per character;
+- the big digits of the clock: the same x2 wide, x3 high (16 x 24) at 8 px from the top of 2 x 2 tiles, so the
+  time and the date in rows 0-1 and 2-3 span the logo (y 8..72; user 2026-11-22, variant B);
 - shapes (anti-aliased): solid, rounded ends of buttons, panel corners and edges, lines, meter
   fills, marks;
 - the mono logo of the Mini (assets/logo_mini_56x16.bin = firmware ui2.c logo_full with the m and
@@ -40,8 +41,9 @@ def osd_font():
 
 
 class Atlas:
-    def __init__(self, cw=10, ch=20, logo_xy=(8, 8), logo_scale=4):
+    def __init__(self, cw=10, ch=20, logo_xy=(8, 8), logo_scale=4, big_sy=3, big_dy=8):
         self.cw, self.ch = cw, ch
+        self.big_sy, self.big_dy = big_sy, big_dy
         self.tiles, self.id, self._idx = [], {}, {}
         self.add("empty", bytes(cw * ch))
         self.add("solid", bytes([15]) * (cw * ch))
@@ -63,7 +65,7 @@ class Atlas:
         return i
 
     def _osd_font(self):
-        """The OSD font, each row twice (8 x 16), centred in the cell, 1 bit; the big digits x2 more."""
+        """The OSD font, each row twice (8 x 16), centred in the cell, 1 bit; the big digits 16 x 24."""
         f = osd_font()
         def glyph(code, sx, sy):
             img = Image.new("L", (8 * sx, 8 * sy), 0)
@@ -79,7 +81,8 @@ class Atlas:
         W, H = 2 * self.cw, 2 * self.ch
         for c in BIG_CHARS:
             img = Image.new("L", (W, H), 0)
-            img.paste(glyph(ord(c), 2, 4), ((W - 16) // 2, (H - 32) // 2))
+            dy = (H - 8 * self.big_sy) // 2 if self.big_dy is None else self.big_dy
+            img.paste(glyph(ord(c), 2, self.big_sy), ((W - 16) // 2, dy))
             for k, (x, y) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1))):
                 self.add(f"big:{c}:{k}", img.crop((x * self.cw, y * self.ch, (x + 1) * self.cw, (y + 1) * self.ch)))
 
