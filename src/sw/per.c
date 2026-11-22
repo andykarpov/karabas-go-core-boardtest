@@ -307,7 +307,7 @@ static int ft_check(void) {
   uint32_t khz = u1 != u0 ? (uint32_t) ((uint64_t) (c1 - c0) * 1000u / (u1 - u0)) : 0;
   int ok = khz > 46600 && khz < 51600;
   p = fmt_u(t, khz / 1000); *p++ = '.'; p = fmt_u(p, khz % 1000 / 100);
-  str_cpy(p, ok ? " MHz (FT_CLK_OUT 8.18 MHz x 6)" : " MHz: not 49 (FT_CLK_OUT 8.18 MHz?)");
+  str_cpy(p, ok ? " MHz (its 8 MHz clock x 6)" : " MHz: not 48..49 (its 8 MHz clock?)");
   row(2, "Clock", t, ok ? C_TEXT : C_FAIL);
   row(3, "INT_N", (IOR(PE_SPI_CTL) & 8) ? "high (idle)" : "low", C_TEXT);
   return ok && !cpu ? ST_PASS : ST_FAIL;
@@ -316,7 +316,7 @@ static int ft_check(void) {
 void ft_open(group_t *g) {
   int st = ft_check();
   spi_set(0);
-  set_status(g, st, st == ST_PASS ? "ID 7C, 49 MHz" : st == ST_NA ? "MCU has it" : "FAIL");
+  set_status(g, st, st == ST_PASS ? "ID 7C, clock ok" : st == ST_NA ? "MCU has it" : "FAIL");
   page_hint("The FT812 is woken up as the firmware does; its picture: later");
 }
 
@@ -514,3 +514,66 @@ void wifi_tick(group_t *g) {
 }
 
 void wifi_close(group_t *g) { (void) g; spi_set(0); IOW(PE_UART_CTL, 2); }
+
+// ---------------------------------------------------------------- Floppy (the Go): drive A, read only
+
+static void fd_step(uint32_t ctl) {   // one step: DIR set, then a 3 us STEP pulse, 6 ms for the head
+  IOW(PE_FDD, ctl);
+  wait_ms(1);
+  IOW(PE_FDD, ctl | FD_STEP);
+  uint32_t u = R_US; while (R_US - u < 3) ;
+  IOW(PE_FDD, ctl);
+  wait_ms(6);
+}
+static int fd_tr00(void) { return (IOR(PE_FDD) >> 1) & 1; }
+
+// v[0] the step: 0 the motor started, 1 counting the index, 2 done; v[1] its time, v[2] the index count at the start
+void fdd_open(group_t *g) {
+  g->v[0] = 0;
+  IOW(PE_FDD, FD_A | FD_MOTOR);
+  g->v[1] = (int32_t) now_ms();
+  row(0, "Drive", "A: selected, motor on", C_TEXT);
+  page_hint("Read only: nothing is written to the disk (put a disk in drive A)");
+  set_status(g, ST_RUN, 0);
+}
+
+void fdd_tick(group_t *g) {
+  uint32_t ms = now_ms() - (uint32_t) g->v[1];
+  if (g->v[0] == 0) {
+    if (ms < 1000) return;                 // the motor speeds up
+    g->v[2] = (int32_t) (IOR(PE_FDD) >> 8);
+    g->v[3] = (int32_t) IOR(PE_FDD_FLUX);
+    g->v[1] = (int32_t) now_ms();
+    g->v[0] = 1;
+    return;
+  }
+  if (g->v[0] != 1 || ms < 2000) return;
+  g->v[0] = 2;
+  uint32_t idx = (IOR(PE_FDD) >> 8) - (uint32_t) g->v[2], flux = IOR(PE_FDD_FLUX) - (uint32_t) g->v[3];
+  uint32_t rpm = idx * 30;                 // pulses in 2 s
+  char *p = fmt_u(t, rpm); p = str_cpy(p, " rpm ("); p = fmt_u(p, idx); str_cpy(p, " index pulses in 2 s)");
+  int rpm_ok = rpm >= 270 && rpm <= 330;
+  row(1, "Speed", idx ? t : "no index pulses (no disk?)", idx ? (rpm_ok ? C_TEXT : C_FAIL) : C_DIM);
+  p = fmt_u(t, flux / 2); str_cpy(p, " flux pulses / s");
+  row(2, "Read data", t, flux ? C_TEXT : C_DIM);
+  row(3, "Protect", (IOR(PE_FDD) >> 2) & 1 ? "write protected" : "writable", C_TEXT);
+  // track 0: out until TR00 (at most 85 steps), then 2 in (TR00 goes off), back out
+  int n = 0;
+  while (!fd_tr00() && n < 85) { fd_step(FD_A | FD_MOTOR); n++; }
+  int found = fd_tr00(), off = 0;
+  if (found) {
+    fd_step(FD_A | FD_MOTOR | FD_IN); fd_step(FD_A | FD_MOTOR | FD_IN);
+    off = !fd_tr00();
+    while (!fd_tr00() && n < 90) { fd_step(FD_A | FD_MOTOR); n++; }
+  }
+  p = str_cpy(t, found ? "found after " : "not found in 85 steps");
+  if (found) { p = fmt_u(p, (uint32_t) n); str_cpy(p, off ? " steps, off after 2 in" : " steps, but stays on"); }
+  row(4, "Track 0", t, found && off ? C_TEXT : C_FAIL);
+  IOW(PE_FDD, 0);
+  int none = !idx && !found;
+  int st = none ? ST_NA : found && off && rpm_ok && flux ? ST_PASS : ST_FAIL;
+  if (none) row(6, "", "no drive answers (or no disk)", C_DIM);
+  set_status(g, st, st == ST_PASS ? "300 rpm, TR00" : none ? "no drive" : "FAIL");
+}
+
+void fdd_close(group_t *g) { (void) g; IOW(PE_FDD, 0); }

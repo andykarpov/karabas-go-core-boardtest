@@ -24,7 +24,12 @@ static uint32_t scratch, readc;
 volatile uint32_t *host_reg(uint32_t off) {
   switch (off) {
     case 0x1c: ms++; regs[off / 4] = ms; break;                   // R_MS: 1 ms per read
-    case 0x40: regs[off / 4] = ms * 1000u; break;                  // R_US: with R_MS
+    case 0x40: {                                                   // R_US: with R_MS, + 1 us per read within it
+      static uint32_t ms_us, sub;
+      if (ms_us != ms) { ms_us = ms; sub = 0; } else if (sub < 999) sub++;
+      regs[off / 4] = ms * 1000u + sub;
+      break;
+    }
     case 0x30: regs[off / 4] = kbdn; break;
     case 0x800: regs[off / 4] = 0x456789ABu; break;               // DNA
     case 0x804: regs[off / 4] = 0x80000000u | 0x0123u; break;
@@ -177,13 +182,14 @@ uint32_t host_rd(uint32_t off) {
 
 // ---------------- RPC ----------------
 int rpc_enabled(void) { return 1; }
+static int host_board = 3;   // HW_ID: 1 Go, 2 Mini, 3 Mini G
 static int fw_new = 1;   // the firmware has I2C_SCAN / LED
 int rpc_call(uint8_t svc, uint8_t fn, const void *in, uint16_t in_len, void *out, uint16_t out_max,
              uint16_t *out_len, uint32_t timeout_ms) {
   (void) in_len; (void) timeout_ms; (void) out_max;
   uint8_t *o = (uint8_t *) out;
   uint16_t n = 0;
-  if (svc == RPC_SYS && fn == 0) { memcpy(o, "26112201", 8); o[8] = 3; o[9] = 1; o[10] = 15; o[11] = 0; o[12] = 0; n = 13; }
+  if (svc == RPC_SYS && fn == 0) { memcpy(o, "26112201", 8); o[8] = (uint8_t) host_board; o[9] = 1; o[10] = 15; o[11] = 0; o[12] = 0; n = 13; }
   else if (svc == RPC_SYS && fn == 1) {
     uint32_t s = 59 + ms / 1000;
     uint8_t t[8] = { 0xEA, 0x07, 11, 22, 12, (uint8_t) (59 + s / 60) % 60, (uint8_t) (s % 60), 6 };
@@ -236,6 +242,7 @@ int main(int argc, char **argv) {
   const char *sc = argv[1];
   if (!strcmp(sc, "rtc_oldfw") || !strcmp(sc, "leds_oldfw") || !strcmp(sc, "sd_none")) fw_new = 0;
   if (!strcmp(sc, "sd_none")) dev_sd2 = 0;
+  if (!strcmp(sc, "floppy") || !strcmp(sc, "go_main")) host_board = 1;
   if (!strcmp(sc, "cf_none")) dev_cf = 0;
   if (!strcmp(sc, "ft_fail")) dev_ft = 0;
   if (!strcmp(sc, "wifi_none")) { dev_8266 = 0; dev_e32 = 0; }
@@ -320,6 +327,8 @@ int main(int argc, char **argv) {
     fprintf(stderr, "%s: [%s] %s\n", sc, groups[i].info, sdram_diag());
   }
   else if (!strncmp(sc, "sd", 2) && (sc[2] == 0 || sc[2] == '_')) { app_open(find("SD cards")); run(100); }
+  else if (!strcmp(sc, "floppy")) { app_open(find("Floppy")); run(4000); }
+  else if (!strcmp(sc, "go_main")) run(10);
   else if (!strncmp(sc, "cf", 2)) { app_open(find("CF / IDE")); run(100); }
   else if (!strncmp(sc, "ft", 2)) { app_open(find("FT812")); run(100); }
   else if (!strncmp(sc, "wifi", 4)) {

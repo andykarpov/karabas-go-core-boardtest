@@ -1,6 +1,6 @@
 # Command line build of the board test core (the Makefile of karabas-go-core-menu, docs/PLAN.md).
 #
-#   make                 all the boards (boardtest.kg); Ф0-Ф4 the Mini G only (Go / Mini in Ф5)
+#   make                 all the boards (boardtest.kg): go, mini, minig
 #   make minig           one board: the CPU program, synthesis, implementation, bitstream, .kg file
 #   make minig-xst       one step: <board>-xst (.ngc), <board>-impl (.bin), <board>-core (.kg)
 #   make minig-report    LUTs, slices, block RAMs and the timing result of the last build (and of -coremode)
@@ -14,7 +14,7 @@
 
 ISE_SETTINGS ?= /opt/Xilinx/14.7/ISE_DS/settings64.sh
 PART = xc6slx25-ftg256-2
-BOARDS = minig
+BOARDS = go mini minig
 
 SHELL = /bin/bash
 .SHELLFLAGS = -e -o pipefail -c

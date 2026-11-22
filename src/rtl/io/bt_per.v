@@ -26,6 +26,11 @@
          the data of a write; the cycle starts. R bit 0 a cycle runs
    24 R  IDE_DATA: the 16 bits of the last read cycle
    28 W  IDE_RST: bit 0 RESET_N held low
+ the floppy port of the Go (the pins high = active: the board inverts them to the connector; all 0 at rest):
+   30 W  FDD_OUT: bits 1:0 the drive selects, bit 2 the motor, bit 3 DIR, bit 4 STEP, bit 5 the side (SIDE_N pin: 1 =
+         side 1); WDATA and WGATE stay 0 (nothing is written)
+      R  bit 0 INDEX, 1 TR00, 2 WPRT, 3 RDATA now; bits 31:8 the INDEX pulses (counting)
+   34 R  FDD_FLUX: the RDATA pulses (counting)
 */
 module bt_per #(
 	parameter integer CLKS_PER_BIT = 651          // 75 MHz / 115200
@@ -62,8 +67,23 @@ module bt_per #(
 	output reg ide_rst_n = 1'b1,
 	input wire [15:0] ide_d_i,
 	output reg [15:0] ide_d_o = 16'd0,
-	output reg ide_d_oe = 1'b0
+	output reg ide_d_oe = 1'b0,
+	// the floppy port (Go)
+	output reg [5:0] fdd_out = 6'd0,          // { side, step, dir, motor, drive[1:0] }
+	input wire [3:0] fdd_in                   // { rdata, wprt, tr00, index }
 );
+
+// ------------------------------------------------------------------ the floppy port
+
+reg [3:0] fdd_s1 = 4'd0, fdd_s2 = 4'd0, fdd_s3 = 4'd0;
+reg [23:0] fdd_idx = 24'd0;
+reg [31:0] fdd_flux = 32'd0;
+always @(posedge clk) begin
+	fdd_s1 <= fdd_in; fdd_s2 <= fdd_s1; fdd_s3 <= fdd_s2;
+	if (fdd_s2[0] & ~fdd_s3[0]) fdd_idx <= fdd_idx + 24'd1;
+	if (fdd_s2[3] & ~fdd_s3[3]) fdd_flux <= fdd_flux + 32'd1;
+	if (we && a == 4'd12) fdd_out <= wd[5:0];
+end
 
 // ------------------------------------------------------------------ SPI
 
@@ -254,6 +274,8 @@ always @(posedge clk) begin
 		4'd5: rd <= { 21'd0, rxf_count + { 10'd0, rxf_have } };
 		4'd8: rd <= { 31'd0, ide_busy };
 		4'd9: rd <= { 16'd0, ide_q };
+		4'd12: rd <= { fdd_idx, 4'd0, fdd_s2 };
+		4'd13: rd <= fdd_flux;
 		default: rd <= 32'd0;
 	endcase
 end
