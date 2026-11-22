@@ -71,7 +71,7 @@ static void fpga_open(group_t *g) {
   page_row(1, "Board", board_name, C_TEXT);
   page_row(2, "Firmware", fw_build, C_TEXT);
   page_row(3, "MCU link", rpc_enabled() ? "link v2, RPC up" : "no RPC (old firmware?)", rpc_enabled() ? C_TEXT : C_FAIL);
-  page_row(4, "CPU", "VexRiscv rv32im 75 MHz, 64 KB block RAM", C_TEXT);
+  page_row(4, "CPU", "VexRiscv rv32im 75 MHz, 56 KB block RAM", C_TEXT);
   page_row(5, "Video", (IO_BTN >> 8) & 1 ? "DVI (no audio), 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
   int ok = (hi >> 31) && rpc_enabled();
   p = str_cpy(t, "DNA "); fmt_hex(p, lo, 8);

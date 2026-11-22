@@ -17,9 +17,9 @@
    08 R  SPI_NEXT: the byte of the last transfer, and the next transfer of 0xFF starts (a read of a block)
  the uart of the ESP8266 (115200 8N1):
    10 W  UART_TX: a byte to the fifo of 64; R bit 8 a byte from the ESP is there (bits 7..0, reading takes it),
-         bit 9 the tx fifo is full, bit 10 bytes were lost (the rx fifo of 2048 full; reading clears), bit 11 UART_RX
+         bit 9 the tx fifo is full, bit 10 bytes were lost (the rx fifo of 1024 full; reading clears), bit 11 UART_RX
    14 W  UART_CTL: bit 0 CTS held high (the ESP must stop sending), bit 1 the rx fifo emptied
-      R  bits 11:0 bytes in the rx fifo
+      R  bits 10:0 bytes in the rx fifo
  the IDE / CF bus, PIO mode 0 (a cycle of 600 ns: address 6 clocks before the strobe, the strobe 24, 3 after it,
  then 12 of recovery):
    20 W  IDE_GO: bits 2:0 the register (DA2..0), bit 3 CS1 (the control block) else CS0, bit 4 a write, bits 31:16
@@ -135,16 +135,16 @@ reg cts_hold = 1'b0;
 reg rxf_clr = 1'b0;
 wire rxf_full, rxf_empty, txf_full, txf_empty;
 wire [7:0] rxf_do, txf_do;
-wire [11:0] rxf_count;
+wire [10:0] rxf_count;
 wire [6:0] txf_count;
 reg rxf_have = 1'b0;          // rxf_do holds a byte taken from the fifo, not read yet
 reg rxf_rd = 1'b0;
 
-kg_fifo #(.DW(8), .AW(11)) rx_fifo (
+kg_fifo #(.DW(8), .AW(10)) rx_fifo (
 	.clk(clk), .reset(rxf_clr), .wr(rxf_wr), .din(rxf_di), .full(rxf_full),
 	.rd(rxf_rd), .dout(rxf_do), .empty(rxf_empty), .count(rxf_count)
 );
-assign uart_cts = cts_hold | (rxf_count > 12'd1792);   // active low at the ESP: 1 = stop
+assign uart_cts = cts_hold | (rxf_count > 11'd768);   // active low at the ESP: 1 = stop
 
 always @(posedge clk) begin
 	rx_s <= { rx_s[0], uart_rx };
@@ -251,7 +251,7 @@ always @(posedge clk) begin
 		4'd0: rd <= { 16'd0, spi_half, 4'd0, int_s[1], ~det_s[1], mcu_ft_on, spi_busy };
 		4'd1, 4'd2: rd <= { 24'd0, spi_last };
 		4'd4: rd <= { 20'd0, rx_s[1], rx_lost, txf_full, rxf_have, rxf_do };
-		4'd5: rd <= { 20'd0, rxf_count + { 11'd0, rxf_have } };
+		4'd5: rd <= { 21'd0, rxf_count + { 10'd0, rxf_have } };
 		4'd8: rd <= { 31'd0, ide_busy };
 		4'd9: rd <= { 16'd0, ide_q };
 		default: rd <= 32'd0;

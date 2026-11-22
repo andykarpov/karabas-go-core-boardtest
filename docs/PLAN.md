@@ -174,7 +174,7 @@ ESP32 на его шине; у MCU отбирается только по фла
 регистры, IDENTIFY, сектор 0, скорость 64 КБ, все линии D0..D15; FT812 — пробуждение как прошивка (SLEEP, CLKEXT, CLKSEL
 ×6, ACTIVE), REG_ID 7C, CPURESET, REG_CLOCK 48 МГц (FT_CLK_OUT); ESP8266 — AT, AT+GMR, AT+CWMODE_CUR=1, AT+CWLAP, CTS;
 ESP32 — ZiFi32 GET_VER и GET_INFO_STR (сборка). Записей на носители и в ESP (_DEF, CWJAP) нет. Программа выросла до
-44,6 КБ (VexRiscv без RVC): RAM CPU 64 КБ (второй банк 32 КБ, +8 RAMB16). Симуляция `src/sim/per/run_per_sim.sh`,
+44,6 КБ (VexRiscv без RVC): RAM CPU 56 КБ (три банка 32 + 16 + 8 КБ, +4 RAMB16: 64 КБ не влезли — XST увёл остаток в LUT); FIFO приёма ESP8266 1 КБ. Mini G `-t 2`: 55 % LUT, 82 % слайсов, 43 RAMB16 + 9 RAMB8, тайминг и coremode выполнены. Симуляция `src/sim/per/run_per_sim.sh`,
 хост: сценарии sd, sd_none, cf, cf_none, ft, ft_fail, wifi, wifi_none. Картинка FT812 через FT_DE / FT_CLK — отдельным
 шагом после проверки на плате.
 

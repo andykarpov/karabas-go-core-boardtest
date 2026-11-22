@@ -85,7 +85,7 @@ static void sd1_row(group_t *g) {
   p = fmt_kb(p, sec / 2); *p++ = ' ';
   p = str_cpy(p, fs[b[6] < 5 ? b[6] : 0]);
   uint32_t fr = (uint32_t) b[11] | (uint32_t) b[12] << 8 | (uint32_t) b[13] << 16 | (uint32_t) b[14] << 24;
-  p = str_cpy(p, ", free "); p = fmt_kb(p, fr);
+  p = str_cpy(p, ", free "); p = fr == 0xFFFFFFFFu ? str_cpy(p, "?") : fmt_kb(p, fr);
   b[n] = 0;
   if (n > 15 && b[15]) { p = str_cpy(p, " \""); str_copy_n(p, (const char *) b + 15, 12); p += str_len(p); *p++ = '"'; *p = 0; }
   row(0, "SD1", t, C_TEXT);
