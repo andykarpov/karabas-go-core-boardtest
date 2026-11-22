@@ -177,6 +177,9 @@ ESP32 — ZiFi32 GET_VER и GET_INFO_STR (сборка). Записей на н�
 44,6 КБ (VexRiscv без RVC): RAM CPU 56 КБ (три банка 32 + 16 + 8 КБ, +4 RAMB16: 64 КБ не влезли — XST увёл остаток в LUT); FIFO приёма ESP8266 1 КБ. Mini G `-t 2`: 55 % LUT, 82 % слайсов, 43 RAMB16 + 9 RAMB8, тайминг и coremode выполнены. Симуляция `src/sim/per/run_per_sim.sh`,
 хост: сценарии sd, sd_none, cf, cf_none, ft, ft_fail, wifi, wifi_none. Картинка FT812 через FT_DE / FT_CLK — отдельным
 шагом после проверки на плате.
+На плате (2026-11-22, 26112209, кадры `docs/img/f3_board_*.png`): SD2 PASS (SDHC 29,1 ГБ, 1196 КБ/с), CF PASS (шилд,
+978 МБ, 1421 КБ/с PIO 0, D0..D15), FT812 PASS (REG_ID 7C, 49,0 МГц = FT_CLK_OUT 8,18 МГц × 6), Wi-Fi PASS (ESP8266 AT 1.7.6,
+скан, CTS соблюдается; ESP32 ZiFi32 0.6.4). SD1 — N/A до прошивки с PR #167.
 
 ### Ф4. Автоматика
 - **Автопрогон** (пользователь 2026-11-22): проверки, не требующие оператора — FPGA / MCU, SRAM, SDRAM, SD cards,

@@ -296,16 +296,18 @@ static int ft_check(void) {
   }
   str_cpy(t + str_len(t), ": the chip answers");
   row(0, "SPI", t, C_TEXT);
-  uint32_t cpu = ft_rd32(0x302020) & 0xFF;
+  uint32_t cpu;                                     // its engines leave reset some ms after ACTIVE (the firmware waits 1 s)
+  t0 = now_ms();
+  while ((cpu = ft_rd32(0x302020) & 0xFF) != 0 && now_ms() - t0 < 1000) wait_ms(1);
   row(1, "CPU reset", cpu ? "held" : "0 (its engines run)", cpu ? C_FAIL : C_TEXT);
   // its clock: REG_CLOCK over 20 ms (FT_CLK_OUT 8 MHz x 6)
   uint32_t u0 = R_US, c0 = ft_rd32(0x302008);
   wait_ms(20);
   uint32_t u1 = R_US, c1 = ft_rd32(0x302008);
   uint32_t khz = u1 != u0 ? (uint32_t) ((uint64_t) (c1 - c0) * 1000u / (u1 - u0)) : 0;
-  int ok = khz > 45600 && khz < 50400;
+  int ok = khz > 46600 && khz < 51600;
   p = fmt_u(t, khz / 1000); *p++ = '.'; p = fmt_u(p, khz % 1000 / 100);
-  str_cpy(p, ok ? " MHz (8 MHz FT_CLK_OUT x 6)" : " MHz: not 48 (FT_CLK_OUT 8 MHz?)");
+  str_cpy(p, ok ? " MHz (FT_CLK_OUT 8.18 MHz x 6)" : " MHz: not 49 (FT_CLK_OUT 8.18 MHz?)");
   row(2, "Clock", t, ok ? C_TEXT : C_FAIL);
   row(3, "INT_N", (IOR(PE_SPI_CTL) & 8) ? "high (idle)" : "low", C_TEXT);
   return ok && !cpu ? ST_PASS : ST_FAIL;
