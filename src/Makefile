@@ -34,7 +34,7 @@ MAP_OPT = -logic_opt off -ol high -xe n -xt 0 -register_duplication off -r 4 -gl
 PAR_OPT = -ol high -xe n -mt 4
 
 # included or read by the sources, not in the prj
-INCLUDES = $(wildcard ../modules/rtl/mcu/*.vh)
+INCLUDES = $(wildcard ../modules/rtl/mcu/*.vh) rtl/io/bt_qsin.vh
 
 ROMS = roms/bt.bin roms/atlas1.bin roms/atlas4.bin
 

@@ -67,6 +67,7 @@ bt_soc soc (
 	.pal_we(pal_we), .pal_wa(pal_wa), .pal_wd(pal_wd),
 	.atl_we(atl_we), .atl_4b(atl_4b), .atl_a(atl_a), .atl_d(atl_d),
 	.cursor(cursor), .grad_top(grad_top), .grad_bot(grad_bot), .show(show), .frame_t(frame_t),
+	.bio_we(), .bio_rd_go(), .bio_a(), .bio_wd(), .bio_rd(32'd0),
 	.rpc_a(rpc_a), .rpc_we(rpc_we), .rpc_wd(rpc_wd), .rpc_rd(rpc_rd),
 	.dbg_uart(dbg_uart), .dbg_uart_wr(dbg_uart_wr), .cpu_run(cpu_run)
 );

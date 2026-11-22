@@ -25,6 +25,7 @@
      38 R  JOY: { joy_r, joy_l }
      3c R  WHEEL: bits 11..0 the wheel sum (signed, saturated; + = away from the user; reading clears)
      44 W  CURSOR: bit 31 shown, bits 25..16 y, bits 10..0 x (the hot spot, pixels)
+     800..ffc    IO: bt_io (rtl/io/bt_io.v: DNA, buttons, LED matrix, sound, ADC, tape, MIDI)
      400..43c W  PAL: entry (a - 400) / 4 of the 16 colours of the cells = 0xARRGGBB: alpha 0..15 in
                  bits 31..28 (0 transparent, 15 opaque)
      2000..3ffc  RPC: byte (a - 2000) / 4 of the mailbox of kg_l2_rpc (kg_mcu2 RPC_*), in the low byte
@@ -84,6 +85,13 @@ module bt_soc #(
 	output reg [23:0] grad_bot = 24'h000000,
 	output reg show = 1'b0,
 	input wire frame_t,                   // toggles at each frame (synchronised to clk)
+
+	// bt_io (the window 0x800..0xffc): a write, or a read with the data two clocks later
+	output reg bio_we = 1'b0,
+	output reg bio_rd_go = 1'b0,
+	output reg [8:0] bio_a = 9'd0,
+	output reg [31:0] bio_wd = 32'd0,
+	input wire [31:0] bio_rd,
 
 	// RPC (kg_mcu2 RPC_*)
 	output reg [10:0] rpc_a = 11'd0,
@@ -198,7 +206,8 @@ wire [11:0] io_off = { d_adr[9:0], 2'b00 };
 wire io_cell = d_adr[14];                    // 0x10000..
 wire io_rpc = ~d_adr[14] & d_adr[11];        // 0x2000..0x3ffc (word address bit 11)
 // an RPC or cell read: the RAM registers the address, then its output: the data two clocks after
-reg rd_wait = 1'b0, rd_wait2 = 1'b0, rd_cell = 1'b0;
+reg rd_wait = 1'b0, rd_wait2 = 1'b0, rd_cell = 1'b0, rd_bio = 1'b0;
+wire io_bio = ~d_adr[14] & ~d_adr[11] & d_adr[9];   // 0x800..0xffc
 
 function signed [11:0] sat_add(input signed [11:0] a, input [7:0] d);
 	reg signed [12:0] s;
@@ -217,6 +226,8 @@ always @(posedge clk) begin
 	dbg_uart_wr <= 1'b0;
 	rpc_we <= 1'b0;
 	atl_we <= 1'b0;
+	bio_we <= 1'b0;
+	bio_rd_go <= 1'b0;
 	// the atlases from the loader
 	if (ld_atl) begin
 		atl_we <= 1'b1;
@@ -228,7 +239,7 @@ always @(posedge clk) begin
 	rd_wait <= 1'b0;
 	if (rd_wait2) begin
 		io_ack <= 1'b1;
-		io_dat <= rd_cell ? { 14'd0, cell_rd } : { 24'd0, rpc_rd };
+		io_dat <= rd_bio ? bio_rd : rd_cell ? { 14'd0, cell_rd } : { 24'd0, rpc_rd };
 	end
 	if (cpu_reset) begin
 		cycles <= 32'd0;
@@ -258,7 +269,20 @@ always @(posedge clk) begin
 		cursor[31] <= 1'b0;
 	end
 
-	if (io_go && (io_cell || io_rpc)) begin
+	if (io_go && io_bio) begin
+		bio_a <= d_adr[8:0];
+		rd_bio <= 1'b1;
+		rd_cell <= 1'b0;
+		if (d_we) begin
+			bio_wd <= d_dat_o;
+			bio_we <= 1'b1;
+			io_ack <= 1'b1;
+		end else begin
+			bio_rd_go <= 1'b1;
+			rd_wait <= 1'b1;
+		end
+	end else if (io_go && (io_cell || io_rpc)) begin
+		rd_bio <= 1'b0;
 		rd_cell <= io_cell;
 		if (io_cell) begin
 			cell_a <= d_adr[11:0];

@@ -22,7 +22,7 @@ $(B)/%.o: %.c $(wildcard *.h) atlas_gen.h | $(B)
 	$(CROSS)gcc $(CFLAGS) -c $< -o $@
 $(B)/%.o: %.S | $(B)
 	$(CROSS)gcc $(CFLAGS) -c $< -o $@
-SRCS   := main.c scr.c rpc.c util.c
+SRCS   := main.c tests.c scr.c rpc.c util.c
 OBJS   := $(B)/crt0.o $(addprefix $(B)/,$(SRCS:.c=.o))
 $(B)/bt.elf: $(OBJS) link.ld
 	$(CROSS)gcc $(CFLAGS) -nostdlib -nostartfiles -T link.ld -Wl,--gc-sections -o $@ $(OBJS) -lgcc

@@ -26,6 +26,7 @@ run
 -lc Auto
 -reduce_control_sets Auto
 -define { HW_ID3 }
+-vlgincdir { rtl/io }
 -fsm_extract YES -fsm_encoding Auto
 -safe_implementation No
 -fsm_style LUT
