@@ -9,7 +9,8 @@
 -- gradient of the boot menu (menu_compose); nothing of the UI is in the SRAM or the SDRAM. The top after the one of
 -- karabas-go-core-menu.
 --
--- Ф0: the SRAM and the SDRAM idle, the base board set of the cores (tape, MIDI, ADC, audio peaks) comes in Ф1.
+-- Ф1: the base board set (tape in / out + monitor, MIDI_TX, the ADC, the audio peaks to the LED matrix of the MCU,
+-- FT_CLK_OUT) and the hooks of the tests (bt_io, bt_audio). The SRAM and the SDRAM stay idle until Ф2.
 --
 -- @author Andy Karpov <andy.karpov@gmail.com>
 -- EU, 2026
@@ -117,8 +118,8 @@ module karabas_minig_top (
     output wire           FLASH_HOLD_N
 );
 
-// idle in Ф0: the SRAM (no access: both chips deselected by MRD_N / MWR_N high), the SDRAM (no command: ~CS on
-// the G2 high), the CF bus, the ESP, tape, MIDI
+// idle until their tests: the SRAM (no access: both chips deselected by MRD_N / MWR_N high), the SDRAM (no command:
+// ~CS on the G2 high), the CF bus, the ESP
 assign MA                 = 21'd0;
 assign MD                 = 16'hzzzz;
 assign MWR_N              = 2'b11;
@@ -142,8 +143,6 @@ assign WWR_N              = 1'b1;
 assign WRESET_N           = 1'b1;
 assign WA                 = 3'b000;
 assign WD                 = 16'hzzzz;
-assign TAPE_OUT           = 1'b0;
-assign MIDI_TX            = 1'b1;
 assign ESP32_SPI_CS_N     = 1'b1;
 assign UART_TX            = 1'b1;
 assign UART_RX            = 1'bz;
@@ -228,8 +227,8 @@ hdmi_top #(.SAMPLERATE(48000)) hdmi_top(
     .ft_sel             (vdac2_sel),
 
     .audio_en           (~dvi_only_s[1]),
-    .audio_l            (adc_l[23:8]),
-    .audio_r            (adc_r[23:8]),
+    .audio_l            (snd_l),
+    .audio_r            (snd_r),
 
     .tmds_p             (TMDS_P),
     .tmds_n             (TMDS_N),
@@ -237,7 +236,7 @@ hdmi_top #(.SAMPLERATE(48000)) hdmi_top(
     .freq               ()
 );
 
-// ------- PCM1808 ADC: the line in and the SAM2695 to the DAC and HDMI (the tests of Ф1 add their sounds) ---------
+// ------- PCM1808 ADC: the line in and the SAM2695 ---------
 wire signed [23:0] adc_l, adc_r;
 i2s_transceiver adc(
     .reset_n            (~areset),
@@ -253,11 +252,24 @@ i2s_transceiver adc(
 );
 ODDR2 oddr_adc2(.Q(ADC_CLK), .C0(clk_sys), .C1(~clk_sys), .CE(1'b1), .D0(1'b1), .D1(1'b0), .R(1'b0), .S(1'b0));
 
+// ------- the sound of the tests: generators, the ADC, the tape monitor -> the DAC and HDMI ---------
+wire signed [15:0] snd_l, snd_r, smp_adc_l, smp_adc_r, smp_mix_l, smp_mix_r;
+wire smp_t, tape_out;
+wire [15:0] aud_ctl;
+wire [31:0] aud_inc_l, aud_inc_r;
+bt_audio #(.CLK_HZ(40909090)) audio (
+    .clk(clk_sys), .ctl(aud_ctl), .inc_l(aud_inc_l), .inc_r(aud_inc_r),
+    .adc_l(adc_l[23:8]), .adc_r(adc_r[23:8]), .tape_in(TAPE_IN),
+    .out_l(snd_l), .out_r(snd_r), .tape_out(tape_out),
+    .smp_t(smp_t), .smp_adc_l(smp_adc_l), .smp_adc_r(smp_adc_r), .smp_mix_l(smp_mix_l), .smp_mix_r(smp_mix_r)
+);
+assign TAPE_OUT = tape_out;
+
 kg_pcm5102 #(.DIV_BITS(2)) PCM5102(
     .clk                (clk_sys),
     .reset              (areset),
-    .left               (adc_l[23:8]),
-    .right              (adc_r[23:8]),
+    .left               (snd_l),
+    .right              (snd_r),
     .din                (DAC_DAT),
     .bck                (DAC_BCK),
     .lrck               (DAC_WS)
@@ -265,8 +277,9 @@ kg_pcm5102 #(.DIV_BITS(2)) PCM5102(
 
 //---------- MCU ------------
 // MCU link v2 (karabas-go-firmware docs/link_v2.md, kg_mcu2): INT on IO1, the bitmap OSD, the FT812 and the SD2
-// slot passed through, RPC (SYS, CFG for the gradient colours of karabas.ini, CORES: the firmware gives the
-// karabas.ini of CFG to a core whose HELLO lists CORES)
+// slot passed through, AUX (the LED matrix: the frames of the CPU and the audio peaks), the buttons (BTNS: the
+// board ones with the action "core" of core.json, the matrix ones), RPC (SYS, CFG for the gradient colours of
+// karabas.ini, CORES: the firmware gives the karabas.ini of CFG to a core whose HELLO lists CORES)
 wire mcu_ft_spi_on, mcu_ft_vga_on, mcu_ft_mosi, mcu_ft_cs_n;
 wire dvi_only;
 wire mcu_int;
@@ -293,11 +306,14 @@ wire [1:0] osd_alpha, osd_place;
 wire [4:0] osd_px, osd_ph;
 wire [3:0] osd_py;
 wire [5:0] osd_pw;
+wire [5:0] btns;
+wire [23:0] matrix_cmd;
+wire matrix_cmd_wr;
 
 kg_mcu2 #(
     .CAPS(16'h0000), .SW_N(2), .CS_FILTER(3),
     .ENABLE_OSD(1), .ENABLE_PORTS(4'b0000),
-    .ENABLE_FT(1), .ENABLE_SD2(1),
+    .ENABLE_FT(1), .ENABLE_SD2(1), .ENABLE_AUX(1),
     .ENABLE_RPC(1), .RPC_SERVICES(16'h0007)    // SYS, CFG, CORES (karabas-go-firmware docs/link_v2.md 5.9)
 ) mcu(
     .CLK(clk_cpu), .N_RESET(~reset_cpu),
@@ -305,7 +321,7 @@ kg_mcu2 #(
     .MCU_SPI_FT_SS(MCU_IO[3]), .MCU_SPI_SD2_SS(MCU_IO[2]),
 
     .SW(), .SW_WR(), .SW_INDEX(), .SW_VALUE(), .HW_ID(), .DVI_ONLY(dvi_only), .CORE_BUILD(), .FW_BUILD(),
-    .BUSY(), .BTNS(), .RELOAD_REQ(1'b0), .RELOAD_CORE(8'd0),
+    .BUSY(), .BTNS(btns), .RELOAD_REQ(1'b0), .RELOAD_CORE(8'd0),
     .KBD(kbd), .KBD_WR(kbd_wr), .PS2_CODE(), .PS2_KIND(), .PS2_WR(), .MS_X(ms_x), .MS_Y(ms_y), .MS_Z(ms_z),
     .MS_B(ms_b), .MS_WR(ms_wr), .JOY_L(joy_l), .JOY_R(joy_r), .JOY_WR(), .PS2_CMD(16'h0000), .PS2_CMD_WR(1'b0),
     .LD_KIND(ld_kind), .LD_SLOT(), .LD_SIZE(), .LD_START(), .LD_ACTIVE(ld_active), .LD_END(ld_end),
@@ -326,6 +342,7 @@ kg_mcu2 #(
 
     .FT_SPI_ON(mcu_ft_spi_on), .FT_VGA_ON(mcu_ft_vga_on), .FT_RESET(), .FT_SCK(), .FT_MOSI(mcu_ft_mosi),
     .FT_MISO(FT_SPI_MISO), .FT_CS_N(mcu_ft_cs_n),
+    .MATRIX_CMD(matrix_cmd), .MATRIX_CMD_WR(matrix_cmd_wr), .DEBUG_ADDR(16'd0), .DEBUG_DATA(16'd0),
     .RPC_A(rpc_a), .RPC_WE(rpc_we), .RPC_WD(rpc_wd), .RPC_RD(rpc_rd),
     .SD2_SCK(), .SD2_MOSI(SD_DI), .SD2_MISO(SD_DO), .SD2_CS_N(SD_CS_N)
 );
@@ -351,8 +368,20 @@ bt_soc soc (
     .pal_we(pal_we), .pal_wa(pal_wa), .pal_wd(pal_wd),
     .atl_we(atl_we), .atl_4b(atl_4b), .atl_a(atl_a), .atl_d(atl_d),
     .cursor(cursor), .grad_top(grad_top), .grad_bot(grad_bot), .show(show), .frame_t(frame_t),
+    .bio_we(bio_we), .bio_rd_go(bio_rd_go), .bio_a(bio_a), .bio_wd(bio_wd), .bio_rd(bio_rd),
     .rpc_a(rpc_a), .rpc_we(rpc_we), .rpc_wd(rpc_wd), .rpc_rd(rpc_rd),
     .dbg_uart(), .dbg_uart_wr(), .cpu_run()
+);
+
+wire bio_we, bio_rd_go;
+wire [8:0] bio_a;
+wire [31:0] bio_wd, bio_rd;
+bt_io #(.CLK_HZ(75000000)) io (
+    .clk(clk_cpu), .we(bio_we), .a(bio_a), .wd(bio_wd), .rd(bio_rd), .rd_go(bio_rd_go),
+    .btns(btns), .dvi_only(dvi_only), .matrix_cmd(matrix_cmd), .matrix_cmd_wr(matrix_cmd_wr),
+    .aud_ctl(aud_ctl), .aud_inc_l(aud_inc_l), .aud_inc_r(aud_inc_r),
+    .smp_t(smp_t), .smp_adc_l(smp_adc_l), .smp_adc_r(smp_adc_r), .smp_mix_l(smp_mix_l), .smp_mix_r(smp_mix_r),
+    .tape_in(TAPE_IN), .midi_tx(MIDI_TX)
 );
 
 //--------- video ---------

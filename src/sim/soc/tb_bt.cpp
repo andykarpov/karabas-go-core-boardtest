@@ -114,6 +114,7 @@ static bool respond(uint8_t id, uint8_t st, const std::vector<uint8_t> &d) {
 static void put_s(std::vector<uint8_t> &v, const char *s) { while (*s) v.push_back((uint8_t) *s++); v.push_back(0); }
 
 static int served = 0;
+static int leds = 0;   // the LEDs held by the core (RPC SYS LED)
 static void serve() {
   req_t r;
   if (!read_req(r)) return;
@@ -122,6 +123,11 @@ static void serve() {
   served++;
   if (r.svc == 0 && r.fn == 0) { for (const char *c = "26112119"; *c; c++) out.push_back(*c); out.insert(out.end(), { 3, 1, 7, 0, 0 }); }
   else if (r.svc == 0 && r.fn == 1) { out = { 0xEA, 0x07, 11, 22, 12, 59, 1, 6 }; }  // 22/11/2026 12:59:01
+  else if (r.svc == 0 && r.fn == 3) {   // I2C_SCAN: the EEPROM 50, the RTC 68, the LED matrix 70 / 71
+    out.assign(16, 0);
+    for (int a : { 0x50, 0x68, 0x70, 0x71 }) out[a >> 3] |= 1 << (a & 7);
+  }
+  else if (r.svc == 0 && r.fn == 4) { if (r.data.size() >= 2) leds = r.data[1] & r.data[0]; }  // LED
   else if (r.svc == 1 && r.fn == 0) {
     // CFG GET: the [ft812] colours of the Ocean theme
     static const char *look = ",color_bg=000608,color_gradient=006a80,color_button=0e2228,color_active=00a0b8,"
