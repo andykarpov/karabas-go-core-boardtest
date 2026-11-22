@@ -323,3 +323,11 @@ NET "hdmi_top/hdmi_pll/mux_sel" TIG;
 INST "hdmi_top/hdmi_tx/ser_d_*" TNM = "TG_SER_D";
 INST "hdmi_top/hdmi_tx/chn*shift_r_*" TNM = "TG_SER_SHIFT";
 TIMESPEC "TS_SER_D" = FROM "TG_SER_D" TO "TG_SER_SHIFT" 3.5 ns DATAPATHONLY;
+# The reset of hdmi_tx (tx_reset_s, pixel clock) -> the asynchronous resets of the serializers (5x clock): its release
+# sets the load phase of each serializer, so it must reach all of them within one 5x clock in the mode of the menu
+# (-coremode). In the FT mode the clocks are not related and PAR did not time it (26112207 coremode -1.2 ns, a 4.4 ns
+# route): the bound keeps it short in both modes.
+INST "hdmi_top/tx_reset_s*" TNM = "TG_TX_RST";
+INST "hdmi_top/hdmi_tx/*shift_r_*" TNM = "TG_SER_RST";
+INST "hdmi_top/hdmi_tx/*mod5_*" TNM = "TG_SER_RST";
+TIMESPEC "TS_SER_RST" = FROM "TG_TX_RST" TO "TG_SER_RST" 3.5 ns DATAPATHONLY;
