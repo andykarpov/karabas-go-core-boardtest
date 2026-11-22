@@ -42,3 +42,7 @@ void sram_open(group_t *g);
 void sram_tick(group_t *g);
 void sram_key(group_t *g, int k);
 const char *sram_diag(void);   // the diagnosis line of the SRAM page
+void sdram_open(group_t *g);
+void sdram_tick(group_t *g);
+void sdram_key(group_t *g, int k);
+const char *sdram_diag(void);

@@ -254,7 +254,13 @@ TIMEGRP "TG_SRAM_IN" = PADS("MD<*>");
 TIMEGRP "TG_SRAM_OUT" = "TG_SRAM_IN" PADS("MA<*>") PADS("MWR_N<*>") PADS("MRD_N<*>");
 TIMESPEC "TS_SRAM_OUT" = FROM FFS TO "TG_SRAM_OUT" 8 ns DATAPATHONLY;
 TIMESPEC "TS_SRAM_IN" = FROM "TG_SRAM_IN" TO FFS 4 ns DATAPATHONLY;
-# The SDRAM: idle until its tester.
+# The SDRAM (bt_sdram) on clk_sd, CLKFX of its DCM_CLKGEN (the PERIOD derived at CLKFX_MD_MAX: 140 MHz). The pins out
+# of IOB flip-flops, DQ into IDDR2s; the SDRAM clock is CLKFX180 out of an ODDR2. The CPU registers (clk_cpu) are held
+# while the tester runs, its results while it is idle, the GO / done toggles go through 3 flip-flops: the crossings
+# are bounded by one period of the faster clock.
+NET "clk_sd" TNM_NET = "TG_CLK_SD";
+TIMESPEC "TS_CPU_TO_SD" = FROM "TG_CLK_CPU" TO "TG_CLK_SD" 7.1 ns DATAPATHONLY;
+TIMESPEC "TS_SD_TO_CPU" = FROM "TG_CLK_SD" TO "TG_CLK_CPU" 7.1 ns DATAPATHONLY;
 
 # MCU link (kg_mcu): SPI mode 0 from the RP2040 at 16 MHz (bursts would go at that speed too, BURST_MAX_MHZ 0);
 # bounded at 32 MHz as in the other cores.

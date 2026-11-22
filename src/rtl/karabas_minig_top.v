@@ -120,19 +120,10 @@ module karabas_minig_top (
 
 // idle until their tests: the SRAM (no access: both chips deselected by MRD_N / MWR_N high), the SDRAM (no command:
 // ~CS on the G2 high), the CF bus, the ESP
-assign FLASH_CS_N         = 1'b1;
 assign FLASH_DI           = 1'b1;
 assign FLASH_SCK          = 1'b0;
 assign FLASH_WP_N         = 1'b1;
 assign FLASH_HOLD_N       = 1'b1;
-assign SDR_WE_N           = 1'b1;
-assign SDR_CAS_N          = 1'b1;
-assign SDR_RAS_N          = 1'b1;
-assign SDR_A              = 13'b0;
-assign SDR_CLK            = 1'b1;
-assign SDR_BA             = 2'b11;
-assign SDR_DQM            = 2'b11;
-assign SDR_DQ             = 16'hzzzz;
 assign WCS_N              = 2'b11;
 assign WRD_N              = 1'b1;
 assign WWR_N              = 1'b1;
@@ -374,9 +365,11 @@ wire bio_we, bio_rd_go;
 wire [8:0] bio_a;
 wire [31:0] bio_wd, bio_rd, io_rd, sram_rd;
 wire sel_sram = bio_a[8:3] == 6'h08;
-assign bio_rd = sel_sram ? sram_rd : io_rd;
+wire sel_sdram = bio_a[8:3] == 6'h10;          // 0xa00 bt_sdram
+wire [31:0] sdram_rd;
+assign bio_rd = sel_sram ? sram_rd : sel_sdram ? sdram_rd : io_rd;
 bt_io #(.CLK_HZ(75000000)) io (
-    .clk(clk_cpu), .we(bio_we & ~sel_sram), .a(bio_a), .wd(bio_wd), .rd(io_rd), .rd_go(bio_rd_go & ~sel_sram),
+    .clk(clk_cpu), .we(bio_we & ~sel_sram & ~sel_sdram), .a(bio_a), .wd(bio_wd), .rd(io_rd), .rd_go(bio_rd_go & ~sel_sram & ~sel_sdram),
     .btns(btns), .dvi_only(dvi_only), .matrix_cmd(matrix_cmd), .matrix_cmd_wr(matrix_cmd_wr),
     .aud_ctl(aud_ctl), .aud_inc_l(aud_inc_l), .aud_inc_r(aud_inc_r),
     .smp_t(smp_t), .smp_adc_l(smp_adc_l), .smp_adc_r(smp_adc_r), .smp_mix_l(smp_mix_l), .smp_mix_r(smp_mix_r),
@@ -392,6 +385,36 @@ bt_sram sram (
 genvar gi;
 generate for (gi = 0; gi < 16; gi = gi + 1) begin : g_md
     assign MD[gi] = sram_oe_n[gi] ? 1'bz : sram_do[gi];
+end endgenerate
+
+//--------- the SDRAM tester (Ф2) ---------
+// its clock: a DCM_CLKGEN on clk_cpu, CLKFX = 75 MHz x M / D set by the CPU over PROG (100 .. 140 MHz: the chips of
+// the boards are slow ones, the user 2026-11-22); the start value 28 / 15 (140 MHz) is the highest of the table: the
+// timing is analysed there (CLKFX_MD_MAX). The SDRAM gets
+// CLKFX180 through an ODDR2 (as the old sdram-test core). On the Mini G2 the SDRAM ~CS is T3 (FLASH_CS_N).
+wire sd_fx, sd_fx180, clk_sd, clk_sd180, sd_locked, sd_progdone, sd_progen, sd_progdata, sd_dcm_rst;
+DCM_CLKGEN #(
+    .CLKFXDV_DIVIDE(2), .CLKFX_DIVIDE(15), .CLKFX_MULTIPLY(28), .CLKFX_MD_MAX(1.87), .CLKIN_PERIOD(13.333),
+    .SPREAD_SPECTRUM("NONE"), .STARTUP_WAIT("FALSE")
+) sd_dcm (
+    .CLKIN(clk_cpu), .CLKFX(sd_fx), .CLKFX180(sd_fx180), .CLKFXDV(), .LOCKED(sd_locked), .PROGDONE(sd_progdone),
+    .STATUS(), .FREEZEDCM(1'b0), .PROGCLK(clk_cpu), .PROGDATA(sd_progdata), .PROGEN(sd_progen), .RST(sd_dcm_rst | areset)
+);
+BUFG bufg_sd(.I(sd_fx), .O(clk_sd));
+BUFG bufg_sd180(.I(sd_fx180), .O(clk_sd180));
+ODDR2 #(.DDR_ALIGNMENT("NONE"), .INIT(1'b0), .SRTYPE("SYNC")) sd_clk_oddr (
+    .Q(SDR_CLK), .C0(clk_sd180), .C1(~clk_sd180), .CE(1'b1), .D0(1'b1), .D1(1'b0), .R(1'b0), .S(1'b0));
+
+wire [15:0] sd_do, sd_oe_n;
+bt_sdram sdram (
+    .clk_cpu(clk_cpu), .we(bio_we & sel_sdram), .a(bio_a[2:0]), .wd(bio_wd), .rd(sdram_rd),
+    .dcm_progen(sd_progen), .dcm_progdata(sd_progdata), .dcm_rst(sd_dcm_rst), .dcm_progdone(sd_progdone),
+    .dcm_locked(sd_locked),
+    .clk(clk_sd), .SDR_CS_N(FLASH_CS_N), .SDR_BA(SDR_BA), .SDR_A(SDR_A), .SDR_RAS_N(SDR_RAS_N), .SDR_CAS_N(SDR_CAS_N),
+    .SDR_WE_N(SDR_WE_N), .SDR_DQM(SDR_DQM), .DQ_I(SDR_DQ), .DQ_O(sd_do), .DQ_OE_N(sd_oe_n)
+);
+generate for (gi = 0; gi < 16; gi = gi + 1) begin : g_sdq
+    assign SDR_DQ[gi] = sd_oe_n[gi] ? 1'bz : sd_do[gi];
 end endgenerate
 
 //--------- video ---------

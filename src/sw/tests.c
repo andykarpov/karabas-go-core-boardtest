@@ -509,7 +509,7 @@ static void later_open(group_t *g) {
 group_t groups[] = {
   { "FPGA / MCU", fpga_open, 0, 0, 0, ST_IDLE, "", {0} },
   { "SRAM", sram_open, sram_tick, sram_key, 0, ST_IDLE, "", {0} },
-  { "SDRAM", later_open, 0, 0, 0, ST_IDLE, "", {0} },
+  { "SDRAM", sdram_open, sdram_tick, sdram_key, 0, ST_IDLE, "", {0} },
   { "SPI flash", later_open, 0, 0, 0, ST_NA, "not fitted", {0, 0, 0, 0, 0, 0, 1, 0} },
   { "SD cards", later_open, 0, 0, 0, ST_IDLE, "", {0} },
   { "CF / IDE", later_open, 0, 0, 0, ST_IDLE, "", {0} },

@@ -8,10 +8,10 @@
 
  Clocks. The registers of the CPU are on clk_cpu (75 MHz), the tester on clk (CLKFX of a DCM_CLKGEN on clk_cpu, the
  top): its M / D are set by the CPU (FREQ) over the PROG port of the DCM (as the frequency keys of MiSTer MemTest and
- of the old sdram-test core), 100 .. 166.7 MHz. The SDRAM clock is CLKFX180 (an ODDR2 in the top): a command out of
+ of the old sdram-test core), 100 .. 140 MHz. The SDRAM clock is CLKFX180 (an ODDR2 in the top): a command out of
  the IOB flip-flops at a rise of clk is taken by the SDRAM half a clock later. A read gives its data CL clocks after
  that plus tAC; MD is taken by IDDR2s at both edges of clk, the one RDLY half clocks after the READ is used (the CPU
- sets it: the program finds the window at each frequency; 7 suits the datasheet timing at CL 3 from 100 to 166 MHz).
+ sets it: the program finds the window at each frequency; 7 suits the datasheet timing at CL 3 from 100 to 140 MHz).
 
  The CPU side crosses by a toggle (GO) and the busy flag (two flip-flops); the registers it wrote are steady while the
  tester runs, the results steady while it is idle (TS_SDR_* of the ucf: DATAPATHONLY).
@@ -195,23 +195,28 @@ always @(posedge clk)
 wire go_new = go_pend & ~go_take;
 
 // pins
-(* IOB = "TRUE" *) reg [2:0] cmd = 3'b111;     // RAS, CAS, WE
-(* IOB = "TRUE" *) reg [12:0] sa = 13'd0;
-(* IOB = "TRUE" *) reg [1:0] sba = 2'd0;
-(* IOB = "TRUE" *) reg [1:0] dqm = 2'b11;
-(* IOB = "TRUE" *) reg [15:0] dq_out = 16'd0;
-(* IOB = "TRUE", equivalent_register_removal = "no" *) reg [15:0] dq_oe_n = 16'hFFFF;
+// the state machine sets these; the pins take them a clock later from IOB flip-flops (no clock enable: the IOBs are
+// far, a CE from the state would not meet 6 ns), DQ through ODDR2s (the IDDR2s of the reads share the IOB)
+reg [2:0] cmd = 3'b111;                    // RAS, CAS, WE
+reg [12:0] sa = 13'd0;
+reg [1:0] sba = 2'd0;
+reg [1:0] dqm = 2'b11;
+reg [15:0] dq_out = 16'd0;
+(* equivalent_register_removal = "no" *) reg [15:0] dq_oe_n = 16'hFFFF;
+(* IOB = "TRUE" *) reg [2:0] cmd_q = 3'b111;
+(* IOB = "TRUE" *) reg [12:0] sa_q = 13'd0;
+(* IOB = "TRUE" *) reg [1:0] sba_q = 2'd0;
+(* IOB = "TRUE" *) reg [1:0] dqm_q = 2'b11;
+always @(posedge clk) begin cmd_q <= cmd; sa_q <= sa; sba_q <= sba; dqm_q <= dqm; end
 assign SDR_CS_N = 1'b0;
-assign { SDR_RAS_N, SDR_CAS_N, SDR_WE_N } = cmd;
-assign SDR_A = sa;
-assign SDR_BA = sba;
-assign SDR_DQM = dqm;
-assign DQ_O = dq_out;
-assign DQ_OE_N = dq_oe_n;
+assign { SDR_RAS_N, SDR_CAS_N, SDR_WE_N } = cmd_q;
+assign SDR_A = sa_q;
+assign SDR_BA = sba_q;
+assign SDR_DQM = dqm_q;
 
 localparam [2:0] C_NOP = 3'b111, C_ACT = 3'b011, C_READ = 3'b101, C_WRITE = 3'b100, C_PRE = 3'b010, C_REF = 3'b001,
 	C_MRS = 3'b000;
-// timing at 166.7 MHz (6 ns) and below: tRCD 3, tRP 3, tRAS 7, tWR 2, tRFC 11 clocks (+1 each to be safe)
+// timing at 166.7 MHz (6 ns) and below (the table goes to 140 MHz): tRCD 3, tRP 3, tRAS 7, tWR 2, tRFC 11 clocks (+1 each to be safe)
 localparam [3:0] T_RCD = 4'd4, T_RP = 4'd4, T_WR = 4'd3, T_RFC = 4'd12;
 localparam [3:0] T_RAS = 4'd8;
 localparam [9:0] REF_INT = 10'd767;
@@ -245,12 +250,12 @@ reg [3:0] ref_owed = 4'd0;
 reg ref_pay = 1'b0;
 
 // the read pipeline: an entry per clock since a READ; taken at stage rdly
-reg [7:0] p_v = 8'd0;
-reg [7:0] p_dir = 8'd0;                    // the entry is a direct read
-reg [15:0] p_exp [0:7];
-reg [23:0] p_adr [0:7];
+reg [8:0] p_v = 9'd0;
+reg [8:0] p_dir = 9'd0;                    // the entry is a direct read
+reg [15:0] p_exp [0:8];
+reg [23:0] p_adr [0:8];
 integer pi;
-initial for (pi = 0; pi < 8; pi = pi + 1) begin p_exp[pi] = 16'd0; p_adr[pi] = 24'd0; end
+initial for (pi = 0; pi < 9; pi = pi + 1) begin p_exp[pi] = 16'd0; p_adr[pi] = 24'd0; end
 reg push = 1'b0;
 reg [15:0] push_exp = 16'd0;
 reg [23:0] push_adr = 24'd0;
@@ -262,7 +267,9 @@ reg [23:0] c_adr = 24'd0;
 localparam [3:0] S_RESET = 4'd0, S_WAIT = 4'd1, S_IPRE = 4'd2, S_IREF = 4'd3, S_IMRS = 4'd4, S_IDLE = 4'd5,
 	S_ACT = 4'd6, S_COL = 4'd7, S_RW = 4'd8, S_DRAIN = 4'd9, S_PRE = 4'd10, S_REF = 4'd11, S_DONE = 4'd12;
 reg [3:0] st = S_RESET;
-reg [15:0] tcnt = 16'd0;                   // a wait
+reg [3:0] tcnt = 4'd0;                     // a wait
+reg tz = 1'b1;                             // tcnt is 0 (a flip-flop: the 6 ns paths)
+reg [15:0] iwait = 16'd0;                  // the wait of the power up
 reg [3:0] ras_cnt = 4'd0;                  // clocks since ACTIVE
 reg [3:0] wr_cnt = 4'd0;                   // clocks since the last WRITE
 reg [3:0] nref = 4'd0;
@@ -293,16 +300,16 @@ always @(posedge clk) begin
 	ref_pay <= 1'b0;
 
 	// the read pipeline
-	p_v <= { p_v[6:0], push };
-	p_dir <= { p_dir[6:0], push & ~el };
+	p_v <= { p_v[7:0], push };
+	p_dir <= { p_dir[7:0], push & ~el };
 	p_exp[0] <= push_exp;
 	p_adr[0] <= push_adr;
-	for (pi = 1; pi < 8; pi = pi + 1) begin p_exp[pi] <= p_exp[pi-1]; p_adr[pi] <= p_adr[pi-1]; end
-	// the stage rk - 1 of the pipeline is the READ of rk clocks ago: the IDDR2 has its data at this edge
-	c_v <= p_v[rk - 3'd1];
-	c_dir <= p_dir[rk - 3'd1];
-	c_exp <= p_exp[rk - 3'd1];
-	c_adr <= p_adr[rk - 3'd1];
+	for (pi = 1; pi < 9; pi = pi + 1) begin p_exp[pi] <= p_exp[pi-1]; p_adr[pi] <= p_adr[pi-1]; end
+	// the stage rk of the pipeline is the READ that left the pins rk clocks ago: the IDDR2 has its data at this edge
+	c_v <= p_v[rk];
+	c_dir <= p_dir[rk];
+	c_exp <= p_exp[rk];
+	c_adr <= p_adr[rk];
 	if (c_v) begin
 		if (c_dir) dread <= dq_in_d;
 		else if (dq_in_d != c_exp) begin
@@ -322,7 +329,7 @@ always @(posedge clk) begin
 		inited <= 1'b0;
 		dq_oe_n <= 16'hFFFF;
 		dqm <= 2'b11;
-		p_v <= 8'd0;
+		p_v <= 9'd0;
 	end else case (st)
 	S_RESET: begin
 		inited <= 1'b0;
@@ -331,31 +338,31 @@ always @(posedge clk) begin
 
 	// init: 2^15 clocks (197 us at 166 MHz), PRECHARGE ALL, 8 x AUTO REFRESH, MODE
 	S_WAIT: begin
-		if (tcnt == 16'd0) begin
+		if (iwait == 16'd0) begin
 			cmd <= C_PRE;
 			sa[10] <= 1'b1;
-			tcnt <= { 12'd0, T_RP };
+			begin tcnt <= T_RP; tz <= (T_RP) == 4'd0; end
 			nref <= 4'd8;
 			st <= S_IPRE;
-		end else tcnt <= tcnt - 16'd1;
+		end else iwait <= iwait - 16'd1;
 	end
 	S_IPRE, S_IREF: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else if (nref != 4'd0) begin
 			cmd <= C_REF;
 			nref <= nref - 4'd1;
-			tcnt <= { 12'd0, T_RFC };
+			begin tcnt <= T_RFC; tz <= (T_RFC) == 4'd0; end
 			st <= S_IREF;
 		end else begin
 			cmd <= C_MRS;
 			sba <= 2'b00;
 			sa <= { 3'b000, 1'b0, 2'b00, 1'b0, cl, 1'b0, 3'b000 };   // single write, CL, sequential, burst of 1
-			tcnt <= 16'd3;
+			begin tcnt <= 4'd3; tz <= (4'd3) == 4'd0; end
 			st <= S_IMRS;
 		end
 	end
 	S_IMRS: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else begin
 			inited <= 1'b1;
 			ref_cnt <= 10'd0;
@@ -373,7 +380,7 @@ always @(posedge clk) begin
 			// pay what is owed while idle (all banks are closed here)
 			cmd <= C_REF;
 			ref_pay <= 1'b1;
-			tcnt <= { 12'd0, T_RFC };
+			begin tcnt <= T_RFC; tz <= (T_RFC) == 4'd0; end
 			st <= S_REF;
 		end else if (go_new) begin
 			go_take <= 1'b1;
@@ -401,7 +408,7 @@ always @(posedge clk) begin
 			if (r_go[17] || r_go[1:0] == 2'd0) begin
 				if (r_go[17]) begin
 					cl <= r_cl;
-					tcnt <= 16'hFFFF >> 1;
+					iwait <= 16'h7FFF;
 					st <= S_WAIT;
 				end else begin
 					busy <= 1'b0;
@@ -420,13 +427,13 @@ always @(posedge clk) begin
 		sba <= cur[23:22];
 		sa <= cur[21:9];
 		ras_cnt <= 4'd0;
-		tcnt <= { 12'd0, T_RCD - 4'd1 };
+		begin tcnt <= T_RCD - 4'd1; tz <= (T_RCD - 4'd1) == 4'd0; end
 		st <= S_COL;
 	end
 
 	// a column: READ (pushed into the pipeline), WRITE, or READ then WRITE (S_RW)
 	S_COL: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else begin
 			sba <= cur[23:22];
 			sa <= { 4'b0000, cur[8:0] };      // A10 low: no auto precharge
@@ -444,7 +451,7 @@ always @(posedge clk) begin
 				end else begin
 					// read only: a column a clock
 					if (col_last || el_last || !el) begin
-						tcnt <= { 13'd0, rk } + 16'd1;
+						begin tcnt <= { 1'b0, rk } + 4'd2; tz <= ({ 1'b0, rk } + 4'd2) == 4'd0; end
 						st <= S_DRAIN;
 					end else begin
 						cur <= nxt;
@@ -458,7 +465,7 @@ always @(posedge clk) begin
 				dq_oe_n <= 16'h0000;
 				wr_cnt <= 4'd0;
 				if (col_last || el_last || !el) begin
-					tcnt <= 16'd0;
+					begin tcnt <= 4'd0; tz <= (4'd0) == 4'd0; end
 					st <= S_DRAIN;
 				end else begin
 					cur <= nxt;
@@ -480,12 +487,12 @@ always @(posedge clk) begin
 			dq_oe_n <= 16'h0000;
 			wr_cnt <= 4'd0;
 			if (col_last || el_last) begin
-				tcnt <= 16'd0;
+				begin tcnt <= 4'd0; tz <= (4'd0) == 4'd0; end
 				st <= S_DRAIN;
 			end else begin
 				cur <= nxt;
 				lfsr <= lfsr_step(lfsr);
-				tcnt <= 16'd0;
+				begin tcnt <= 4'd0; tz <= (4'd0) == 4'd0; end
 				st <= S_COL;
 			end
 		end
@@ -493,25 +500,25 @@ always @(posedge clk) begin
 
 	// the last column of the row: the reads come back, tWR after a write and tRAS pass, then PRECHARGE
 	S_DRAIN: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else if (wr_cnt >= T_WR && ras_cnt >= T_RAS) begin
 			cmd <= C_PRE;
 			sa[10] <= 1'b0;
 			sba <= cur[23:22];
 			dq_oe_n <= 16'hFFFF;
 			dqm <= 2'b11;
-			tcnt <= { 12'd0, T_RP - 4'd1 };
+			begin tcnt <= T_RP - 4'd1; tz <= (T_RP - 4'd1) == 4'd0; end
 			op_end <= !el || el_last;
 			st <= S_PRE;
 		end
 	end
 
 	S_PRE: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else if (ref_owed != 4'd0) begin
 			cmd <= C_REF;
 			ref_pay <= 1'b1;
-			tcnt <= { 12'd0, T_RFC };
+			begin tcnt <= T_RFC; tz <= (T_RFC) == 4'd0; end
 			st <= S_REF;
 		end else if (op_end) begin
 			busy <= 1'b0;
@@ -526,7 +533,7 @@ always @(posedge clk) begin
 
 	// a refresh: then on with the operation (S_PRE) or back to idle
 	S_REF: begin
-		if (tcnt != 16'd0) tcnt <= tcnt - 16'd1;
+		if (!tz) begin tcnt <= tcnt - 4'd1; tz <= tcnt == 4'd1; end
 		else st <= busy ? S_PRE : S_IDLE;
 	end
 
@@ -552,5 +559,19 @@ end endgenerate
 `endif
 reg [15:0] dq_in_d = 16'd0;
 always @(posedge clk) dq_in_d <= rfall ? q_f : q_r;
+
+`ifdef SIM
+reg [15:0] sq_o = 16'd0, sq_t = 16'hFFFF;
+always @(posedge clk) begin sq_o <= dq_out; sq_t <= dq_oe_n; end
+assign DQ_O = sq_o;
+assign DQ_OE_N = sq_t;
+`else
+generate for (gi = 0; gi < 16; gi = gi + 1) begin : g_dqo
+	ODDR2 #(.DDR_ALIGNMENT("C0"), .INIT(1'b0), .SRTYPE("ASYNC")) oddr_d (
+		.Q(DQ_O[gi]), .C0(clk), .C1(~clk), .CE(1'b1), .D0(dq_out[gi]), .D1(dq_out[gi]), .R(1'b0), .S(1'b0));
+	ODDR2 #(.DDR_ALIGNMENT("C0"), .INIT(1'b1), .SRTYPE("ASYNC")) oddr_t (
+		.Q(DQ_OE_N[gi]), .C0(clk), .C1(~clk), .CE(1'b1), .D0(dq_oe_n[gi]), .D1(dq_oe_n[gi]), .R(1'b0), .S(1'b0));
+end endgenerate
+`endif
 
 endmodule

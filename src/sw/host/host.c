@@ -106,10 +106,63 @@ static void sr_reset(int def, int j, int k) {
   memset(sr_reg, 0, sizeof(sr_reg)); memset(sr_out, 0, sizeof(sr_out));
   sr_reg[4] = 1; sr_reg[5] = 0x1FFFFF; sr_reg[6] = 2;
 }
+// ---------------- the SDRAM tester (bt_sdram) and the chip: elements over the first 1M halfwords only (time) ----------------
+// sd_def: 0 none, 1 DQ K stuck at 1, 8 bit 3 flips in some cells above 135 MHz
+static int sd_def, sd_k = 5;
+static uint16_t *sd_mem;
+static uint32_t sd_reg[8], sd_out[8], sd_mhz = 100;
+static uint16_t sd_crd(uint32_t a) {
+  uint16_t v = sd_mem[a & 0xFFFFFF];
+  if (sd_def == 1) v |= (uint16_t) (1u << sd_k);
+  if (sd_def == 8 && sd_mhz > 135 && (a & 0x3FF) == 0x155) v ^= 8;
+  return v;
+}
+static void sd_cwr(uint32_t a, uint16_t v, int lanes) {
+  uint16_t o = sd_mem[a & 0xFFFFFF];
+  sd_mem[a & 0xFFFFFF] = (uint16_t) (((lanes & 1) ? (v & 0xFF) : (o & 0xFF)) | ((lanes & 2) ? (v & 0xFF00) : (o & 0xFF00)));
+}
+static void sd_go_m(uint32_t v) {
+  if (v & 0x10000) { sd_out[3] = sd_out[4] = sd_out[5] = sd_out[6] = 0; }
+  if (v & 0x20000) { sd_out[0] |= 8; return; }
+  int op = v & 3;
+  if (op == 2) sd_out[2] = sd_crd(sd_reg[1]);
+  else if (op == 3) sd_cwr(sd_reg[1], (uint16_t) sd_reg[2], (v >> 9) & 3);
+  else if (op == 1) {
+    int dn = (v >> 2) & 1, r = (v >> 3) & 1, w = (v >> 4) & 1, rp = (v >> 5) & 3, wp = (v >> 7) & 3;
+    uint32_t last = sd_reg[5] > 0xFFFFF ? 0xFFFFF : sd_reg[5], l = sd_reg[4];
+    for (uint32_t i = 0; i <= last; i++) {
+      uint32_t a = dn ? last - i : i;
+      uint16_t bg = (uint16_t) sd_reg[3];
+      if (r) {
+        uint16_t got = sd_crd(a), e = rp == 0 ? bg : rp == 1 ? (uint16_t) ~bg : rp == 2 ? (uint16_t) l : (uint16_t) (a ^ (a >> 16));
+        if (got != e) {
+          sd_out[3]++; sd_out[4] |= (uint16_t) (got ^ e);
+          if (!(sd_out[5] >> 31)) { sd_out[5] = 0x80000000u | a; sd_out[6] = (uint32_t) got << 16 | e; }
+        }
+      }
+      if (w) sd_cwr(a, wp == 0 ? bg : wp == 1 ? (uint16_t) ~bg : wp == 2 ? (uint16_t) l : (uint16_t) (a ^ (a >> 16)), 3);
+      l = (l & 1) ? ((l >> 1) ^ 0x80200003u) : (l >> 1);
+    }
+  }
+}
+static void sd_reset(int def, int k) {
+  if (!sd_mem) sd_mem = malloc(0x1000000 * 2);
+  for (uint32_t i = 0; i < 0x1000000; i++) sd_mem[i] = (uint16_t) (i * 2654435761u >> 16);
+  sd_def = def; sd_k = k;
+  memset(sd_reg, 0, sizeof(sd_reg)); memset(sd_out, 0, sizeof(sd_out));
+  sd_out[0] = 4;   // locked
+}
 void host_wr(uint32_t off, uint32_t v) {
+  if (off >= 0xa00 && off < 0xa20) {
+    int i = (int) (off - 0xa00) / 4;
+    if (i == 0) sd_go_m(v);
+    else if (i == 7) { uint32_t m = (v & 0xFF) + 1, d = ((v >> 8) & 0xFF) + 1; sd_mhz = 75 * m / d; sd_out[0] = 4; }
+    else sd_reg[i] = v;
+  }
   if (off >= 0x900 && off < 0x920) { int i = (int) (off - 0x900) / 4; if (i) sr_reg[i] = v; else sr_go(v); }
 }
 uint32_t host_rd(uint32_t off) {
+  if (off >= 0xa00 && off < 0xa20) return off == 0xa04 ? sd_reg[5] : sd_out[(off - 0xa00) / 4];
   if (off >= 0x900 && off < 0x920) return sr_out[(off - 0x900) / 4];
   return 0;
 }
@@ -234,6 +287,16 @@ int main(int argc, char **argv) {
       fprintf(stderr, "sram_diag: defect %d: %s [%s] %s\n", d[n].def, ok ? "ok" : "WRONG", groups[i].info, g);
     }
     fprintf(stderr, "sram_diag: %s\n", bad ? "FAIL" : "all ok");
+  }
+  else if (!strcmp(sc, "sdram") || !strcmp(sc, "sdram_slow") || !strcmp(sc, "sdram_fail")) {
+    // a sweep over; the slow one fails above 135 MHz, the failed one has DQ5 stuck at 1
+    sd_reset(!strcmp(sc, "sdram_slow") ? 8 : !strcmp(sc, "sdram_fail") ? 1 : 0, 5);
+    int i = find("SDRAM");
+    app_open(i);
+    while (groups[i].status == ST_RUN) run(1);
+    if (!strcmp(sc, "sdram_fail")) for (int n = 0; n < 40; n++) run(1);
+    else press(K_SPACE);
+    fprintf(stderr, "%s: [%s] %s\n", sc, groups[i].info, sdram_diag());
   }
   else if (!strcmp(sc, "input_esc")) {
     // a short Esc stays on the page, a held one (over a second) leaves it

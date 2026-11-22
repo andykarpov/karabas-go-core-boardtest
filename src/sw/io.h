@@ -61,3 +61,24 @@ uint32_t host_rd(uint32_t off);
 // an element: down, read (pattern rp), write (pattern wp); patterns 0 BG, 1 ~BG, 2 LFSR, 3 the address
 #define SR_EL(dn, r, w, rp, wp) (1u | (dn) << 2 | (r) << 3 | (w) << 4 | (rp) << 5 | (wp) << 7)
 #define SR_WORDS    0x200000u   // 2M halfwords
+
+// The SDRAM tester bt_sdram (rtl/mem/bt_sdram.v): MMIO 0x80000a00.. (offsets for IOW / IOR)
+#define SD_GO       0xa00       // W: the operation (SD_INIT / SR_EL / SR_DRD / SR_DWR + SR_CLEAR); R: SD_ST_*
+#define SD_ADR      0xa04       // W: the halfword of a direct access
+#define SD_CUR      0xa04       // R: the halfword of the element now (bits 23:16 steady enough)
+#define SD_DAT      0xa08       // W / R: as SR_DAT
+#define SD_BG       0xa0c
+#define SD_ERRORS   0xa0c
+#define SD_SEED     0xa10
+#define SD_MASK     0xa10
+#define SD_LAST     0xa14
+#define SD_FIRST_A  0xa14
+#define SD_CFG      0xa18       // W: bits 1:0 CL, 7:4 the read delay in half clocks
+#define SD_FIRST_D  0xa18
+#define SD_FREQ     0xa1c       // W: the DCM to 75 MHz x M / D: (M - 1) | (D - 1) << 8
+#define SD_INIT     0x20000u
+#define SD_ST_BUSY  1u
+#define SD_ST_PROG  2u
+#define SD_ST_LOCK  4u
+#define SD_ST_INIT  8u
+#define SD_WORDS    0x1000000u  // 16M halfwords
