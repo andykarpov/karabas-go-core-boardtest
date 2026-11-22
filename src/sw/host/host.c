@@ -24,6 +24,7 @@ static uint32_t scratch, readc;
 volatile uint32_t *host_reg(uint32_t off) {
   switch (off) {
     case 0x1c: ms++; regs[off / 4] = ms; break;                   // R_MS: 1 ms per read
+    case 0x40: regs[off / 4] = ms * 1000u; break;                  // R_US: with R_MS
     case 0x30: regs[off / 4] = kbdn; break;
     case 0x800: regs[off / 4] = 0x456789ABu; break;               // DNA
     case 0x804: regs[off / 4] = 0x80000000u | 0x0123u; break;
@@ -152,7 +153,12 @@ static void sd_reset(int def, int k) {
   memset(sd_reg, 0, sizeof(sd_reg)); memset(sd_out, 0, sizeof(sd_out));
   sd_out[0] = 4;   // locked
 }
+int per_wr(uint32_t off, uint32_t v);
+int per_rd(uint32_t off, uint32_t *v);
+extern int dev_sd2, dev_cf, dev_ft, dev_e32, dev_8266;
+uint32_t host_ms(void) { return ms; }
 void host_wr(uint32_t off, uint32_t v) {
+  if (per_wr(off, v)) return;
   if (off >= 0xa00 && off < 0xa20) {
     int i = (int) (off - 0xa00) / 4;
     if (i == 0) sd_go_m(v);
@@ -162,6 +168,8 @@ void host_wr(uint32_t off, uint32_t v) {
   if (off >= 0x900 && off < 0x920) { int i = (int) (off - 0x900) / 4; if (i) sr_reg[i] = v; else sr_go(v); }
 }
 uint32_t host_rd(uint32_t off) {
+  uint32_t pv;
+  if (per_rd(off, &pv)) return pv;
   if (off >= 0xa00 && off < 0xa20) return off == 0xa04 ? sd_reg[5] : sd_out[(off - 0xa00) / 4];
   if (off >= 0x900 && off < 0x920) return sr_out[(off - 0x900) / 4];
   return 0;
@@ -187,6 +195,15 @@ int rpc_call(uint8_t svc, uint8_t fn, const void *in, uint16_t in_len, void *out
     for (int i = 0; i < 4; i++) o[a[i] >> 3] |= 1 << (a[i] & 7);
     n = 16;
   } else if (svc == RPC_SYS && fn == 4) { if (!fw_new) return RPC_UNKNOWN; }
+  else if (svc == RPC_SYS && fn == 5) {   // SD_INFO: a 32 GB SDHC, FAT32, 21.4 GB free, "KARABAS"
+    if (!fw_new) return RPC_UNKNOWN;
+    uint32_t sec = 62333952u, tot = 31150080u, fr = 22437888u;
+    o[0] = 1; o[1] = 2;
+    for (int i = 0; i < 4; i++) { o[2 + i] = (uint8_t) (sec >> 8 * i); o[7 + i] = (uint8_t) (tot >> 8 * i); o[11 + i] = (uint8_t) (fr >> 8 * i); }
+    o[6] = 3;
+    strcpy((char *) o + 15, "KARABAS");
+    n = 23;
+  }
   else if (svc == RPC_CFG && fn == 0) {
     // the Ocean theme of the bench
     static const char *v[7] = { "000608", "006a80", "0e2228", "00a0b8", "e0fcff", "ffffff", "5a8088" };
@@ -217,7 +234,11 @@ static int find(const char *name) {
 int main(int argc, char **argv) {
   if (argc < 3) return 1;
   const char *sc = argv[1];
-  if (!strcmp(sc, "rtc_oldfw") || !strcmp(sc, "leds_oldfw")) fw_new = 0;
+  if (!strcmp(sc, "rtc_oldfw") || !strcmp(sc, "leds_oldfw") || !strcmp(sc, "sd_none")) fw_new = 0;
+  if (!strcmp(sc, "sd_none")) dev_sd2 = 0;
+  if (!strcmp(sc, "cf_none")) dev_cf = 0;
+  if (!strcmp(sc, "ft_fail")) dev_ft = 0;
+  if (!strcmp(sc, "wifi_none")) { dev_8266 = 0; dev_e32 = 0; }
   app_init();
   if (!strcmp(sc, "main")) {
     // a board half way through: some results
@@ -297,6 +318,16 @@ int main(int argc, char **argv) {
     if (!strcmp(sc, "sdram_fail")) for (int n = 0; n < 40; n++) run(1);
     else press(K_SPACE);
     fprintf(stderr, "%s: [%s] %s\n", sc, groups[i].info, sdram_diag());
+  }
+  else if (!strncmp(sc, "sd", 2) && (sc[2] == 0 || sc[2] == '_')) { app_open(find("SD cards")); run(100); }
+  else if (!strncmp(sc, "cf", 2)) { app_open(find("CF / IDE")); run(100); }
+  else if (!strncmp(sc, "ft", 2)) { app_open(find("FT812")); run(100); }
+  else if (!strncmp(sc, "wifi", 4)) {
+    int i = find("Wi-Fi");
+    app_open(i);
+    for (int n = 0; n < 20000 && groups[i].status == ST_RUN; n++) run(1);
+    run(100);
+    fprintf(stderr, "%s: [%s]\n", sc, groups[i].info);
   }
   else if (!strcmp(sc, "input_esc")) {
     // a short Esc stays on the page, a held one (over a second) leaves it

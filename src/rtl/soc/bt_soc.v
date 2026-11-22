@@ -9,7 +9,7 @@
  menu_soc.v of karabas-go-core-menu.
 
  Memory map of the CPU (sw/mmio.h):
-   0x00000000 RAM, 48 KB in two banks (block RAM, the program from 0: the ROM of boardtest.kg)
+   0x00000000 RAM, 64 KB in two banks (block RAM, the program from 0: the ROM of boardtest.kg)
    0x80000000 MMIO (uncached: the VexRiscv IO range = bit 31), word registers:
      00 W  DBG: a byte of the debug console (dbg_uart, the testbench prints it)
      08 R  FRAMES: frames begun (the start of the vertical sync)
@@ -43,7 +43,7 @@ module bt_soc #(
 	parameter MS_DIV = 17'd75000,         // clocks per millisecond
 	parameter US_DIV = 7'd75,             // clocks per microsecond
 	parameter MEM_AW = 13,                // RAM bank 0 words: 8K = 32 KB
-	parameter MEM1_AW = 12,               // RAM bank 1 words from 8K: 4K = 16 KB (48 KB in all)
+	parameter MEM1_AW = 13,               // RAM bank 1 words from 8K: 8K = 32 KB (64 KB in all)
 	parameter [31:0] RESET_VECTOR = 32'h00000000
 ) (
 	input wire clk,
@@ -171,7 +171,7 @@ wire d_io = d_adr[29];                      // 0x80000000
 // ------------------------------------------------------------------ RAM: port A data (or the loader), port B fetch
 
 reg m_ack = 1'b0;
-// two banks: words 0..8191 (32 KB, MEM_AW) and 8192.. (16 KB, MEM1_AW); the address is held until the ack, so the
+// two banks: words 0..8191 (32 KB, MEM_AW) and 8192.. (32 KB, MEM1_AW); the address is held until the ack, so the
 // bank of a read is chosen by it then
 wire [3:0] ram_we = cpu_reset ? (ld_ram ? (4'b0001 << ld_addr[1:0]) : 4'b0000)
                               : ((d_req && !d_io && d_we && !m_ack) ? d_sel : 4'b0000);

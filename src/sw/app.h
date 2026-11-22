@@ -46,3 +46,11 @@ void sdram_open(group_t *g);
 void sdram_tick(group_t *g);
 void sdram_key(group_t *g, int k);
 const char *sdram_diag(void);
+
+// the storage and the modules (per.c)
+void sd_open(group_t *g);
+void cf_open(group_t *g);
+void ft_open(group_t *g);
+void wifi_open(group_t *g);
+void wifi_tick(group_t *g);
+void wifi_close(group_t *g);
