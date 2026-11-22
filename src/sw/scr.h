@@ -21,7 +21,6 @@ void scr_put(int c, int r, uint16_t tile, int fg, int bg);
 int scr_text(int c, int r, const char *s, int fg, int bg);   // returns the column after it
 void scr_text_n(int c, int r, const char *s, int n, int fg, int bg);  // exactly n cells (cut or padded)
 void scr_fill(int c, int r, int w, int bg);
-void scr_big(int c, int r, const char *s, int fg);   // 2 x 2 cells a character of BIG_CHARS
 // a button of one row: rounded ends, the text centred (or left), a status dot cell (dot >= 0: its
 // colour, -1 an empty dot cell, -2 no dot cell)
 void scr_button(int c, int r, int w, const char *s, int color, int fg, int left, int dot);

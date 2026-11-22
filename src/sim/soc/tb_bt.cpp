@@ -1,6 +1,6 @@
 // tb_bt: the ROMs of boardtest.kg (roms/atlas1.bin, atlas4.bin, bt.bin) loaded through the LD port as the firmware
 // does it, then the program run against a model of the MCU on the link side of kg_l2_rpc (HELLO, SYS INFO,
-// TIME_GET, CFG GET with the Ocean colours). Two frames are captured: after the first drawing with a mouse move
+// CFG GET with the Ocean colours; TIME_GET only for the RTC page, no clock since 26112303). Two frames are captured: after the first drawing with a mouse move
 // (the cursor), and after the key Down (the selection moves). For each frame the cells, the palette, the gradient
 // and the cursor the CPU had written are saved too (frameN.state): tools/frame_model.py draws the frame from them
 // as the RTL should, run_sim.sh compares the two pixel for pixel.
@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     else save_frame("frame2");
   }
   printf("tb_bt: %d requests served\n", served);
-  if (served < 3) { printf("tb_bt: INFO, TIME_GET and CFG GET were not all asked\n"); errors++; }
+  if (served < 2) { printf("tb_bt: INFO and CFG GET were not both asked\n"); errors++; }
   printf("tb_bt: %d errors\n", errors);
   delete t;
   return errors ? 1 : 0;
