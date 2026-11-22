@@ -219,6 +219,10 @@ SCK kg_mcu2, порт дисковода (выходы 0 в покое); Mini �
 karabas-go, `test.kg` и `sdrtest.kg` убрать, репо test / sdram-test архивировать после слияния релиза. Go и Mini на платах
 не проверены (их нет на стенде).
 
+**Релиз (2026-11-22):** PR #7 слит, сборка 26112211 (битстрим Mini G — 26112210, проверенный на плате) в karabas-go
+(#53, `cores/boardtest.kg` синхронизирован, eb8538c); `test.kg` и `sdrtest.kg` удалены, репо `karabas-go-core-test` и
+`karabas-go-core-sdram-test` в архиве. Открыто: Go и Mini на платах, бэклог.
+
 ## Открытые вопросы
 
 См. `docs/BACKLOG.md`.
