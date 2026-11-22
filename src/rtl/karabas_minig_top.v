@@ -120,10 +120,6 @@ module karabas_minig_top (
 
 // idle until their tests: the SRAM (no access: both chips deselected by MRD_N / MWR_N high), the SDRAM (no command:
 // ~CS on the G2 high), the CF bus, the ESP
-assign MA                 = 21'd0;
-assign MD                 = 16'hzzzz;
-assign MWR_N              = 2'b11;
-assign MRD_N              = 2'b11;
 assign FLASH_CS_N         = 1'b1;
 assign FLASH_DI           = 1'b1;
 assign FLASH_SCK          = 1'b0;
@@ -373,16 +369,30 @@ bt_soc soc (
     .dbg_uart(), .dbg_uart_wr(), .cpu_run()
 );
 
+// the window 0x800..0xffc of bt_soc: 0x800 bt_io, 0x900 bt_sram (words 0x40..0x47)
 wire bio_we, bio_rd_go;
 wire [8:0] bio_a;
-wire [31:0] bio_wd, bio_rd;
+wire [31:0] bio_wd, bio_rd, io_rd, sram_rd;
+wire sel_sram = bio_a[8:3] == 6'h08;
+assign bio_rd = sel_sram ? sram_rd : io_rd;
 bt_io #(.CLK_HZ(75000000)) io (
-    .clk(clk_cpu), .we(bio_we), .a(bio_a), .wd(bio_wd), .rd(bio_rd), .rd_go(bio_rd_go),
+    .clk(clk_cpu), .we(bio_we & ~sel_sram), .a(bio_a), .wd(bio_wd), .rd(io_rd), .rd_go(bio_rd_go & ~sel_sram),
     .btns(btns), .dvi_only(dvi_only), .matrix_cmd(matrix_cmd), .matrix_cmd_wr(matrix_cmd_wr),
     .aud_ctl(aud_ctl), .aud_inc_l(aud_inc_l), .aud_inc_r(aud_inc_r),
     .smp_t(smp_t), .smp_adc_l(smp_adc_l), .smp_adc_r(smp_adc_r), .smp_mix_l(smp_mix_l), .smp_mix_r(smp_mix_r),
     .tape_in(TAPE_IN), .midi_tx(MIDI_TX)
 );
+
+//--------- the SRAM tester (Ф2) ---------
+wire [15:0] sram_do, sram_oe_n;
+bt_sram sram (
+    .clk(clk_cpu), .we(bio_we & sel_sram), .a(bio_a[2:0]), .wd(bio_wd), .rd(sram_rd),
+    .MA(MA), .MD_I(MD), .MD_O(sram_do), .MD_OE_N(sram_oe_n), .MWR_N(MWR_N), .MRD_N(MRD_N)
+);
+genvar gi;
+generate for (gi = 0; gi < 16; gi = gi + 1) begin : g_md
+    assign MD[gi] = sram_oe_n[gi] ? 1'bz : sram_do[gi];
+end endgenerate
 
 //--------- video ---------
 wire [27:0] t_rgba;

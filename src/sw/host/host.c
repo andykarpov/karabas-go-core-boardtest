@@ -38,6 +38,82 @@ volatile uint32_t *host_reg(uint32_t off) {
   return &regs[off / 4];
 }
 
+// ---------------- the SRAM tester (bt_sram) and the two chips, with one defect (as src/sim/mem/tb_sram.v) ----------------
+// sr_def: 0 none, 1 MD K stuck at 1, 2 MD K open, 3 MD J, K shorted, 4 MA J, K shorted, 5 MA J open, 6 /WE high dead,
+// 7 /OE low dead
+static int sr_def, sr_j = 3, sr_k = 7;
+static uint8_t *sr_lo, *sr_hi;
+static uint16_t sr_f, sr_c;                     // the two sides of MD (an undriven side keeps its value)
+static uint32_t sr_reg[8], sr_out[8];           // written / read registers
+static uint32_t sr_ca(uint32_t a) {
+  a &= 0x1FFFFF;
+  if (sr_def == 4) { uint32_t b = (a >> sr_j) & (a >> sr_k) & 1; a = (a & ~(1u << sr_j) & ~(1u << sr_k)) | b << sr_j | b << sr_k; }
+  if (sr_def == 5) a &= ~(1u << sr_j);
+  return a;
+}
+static uint16_t sr_short(uint16_t v) {
+  if (sr_def == 3) { int b = (v >> sr_j) & (v >> sr_k) & 1; v = (uint16_t) ((v & ~(1u << sr_j) & ~(1u << sr_k)) | b << sr_j | b << sr_k); }
+  return v;
+}
+static void sr_join_from(int fpga) {           // join the sides, but the open line
+  uint16_t m = sr_def == 2 ? (uint16_t) ~(1u << sr_k) : 0xFFFF;
+  if (fpga) sr_c = (uint16_t) ((sr_c & ~m) | (sr_f & m)); else sr_f = (uint16_t) ((sr_f & ~m) | (sr_c & m));
+  sr_f = sr_short(sr_f); sr_c = sr_short(sr_c);
+}
+static void sr_cwr(uint32_t a, uint16_t v, int lanes) {
+  sr_f = v; sr_join_from(1);
+  uint32_t ca = sr_ca(a);
+  if (lanes & 1) sr_lo[ca] = (uint8_t) sr_c;
+  if ((lanes & 2) && sr_def != 6) sr_hi[ca] = (uint8_t) (sr_c >> 8);
+}
+static uint16_t sr_crd(uint32_t a) {
+  uint32_t ca = sr_ca(a);
+  sr_c = (uint16_t) ((sr_c & (sr_def == 7 ? 0xFF : 0)) | (sr_def == 7 ? 0 : sr_lo[ca]) | sr_hi[ca] << 8);
+  if (sr_def == 1) sr_c |= (uint16_t) (1u << sr_k);
+  sr_join_from(0);
+  return sr_f;
+}
+static uint16_t sr_pat(int p, uint32_t a, uint32_t l) {
+  return p == 0 ? (uint16_t) sr_reg[3] : p == 1 ? (uint16_t) ~sr_reg[3] : p == 2 ? (uint16_t) l : (uint16_t) (a ^ (a >> 16));
+}
+static void sr_go(uint32_t v) {
+  if (v & 0x10000) { sr_out[3] = sr_out[4] = sr_out[5] = sr_out[6] = 0; }
+  int op = v & 3;
+  if (op == 2) sr_out[2] = sr_crd(sr_reg[1]);
+  else if (op == 3) sr_cwr(sr_reg[1], (uint16_t) sr_reg[2], (v >> 9) & 3);
+  else if (op == 1) {
+    int dn = (v >> 2) & 1, r = (v >> 3) & 1, w = (v >> 4) & 1, rp = (v >> 5) & 3, wp = (v >> 7) & 3;
+    uint32_t last = sr_reg[5], l = sr_reg[4];
+    for (uint32_t i = 0; i <= last; i++) {
+      uint32_t a = dn ? last - i : i;
+      if (r) {
+        uint16_t got = sr_crd(a), e = sr_pat(rp, a, l);
+        if (got != e) {
+          sr_out[3]++; sr_out[4] |= (uint16_t) (got ^ e);
+          if (!(sr_out[5] >> 31)) { sr_out[5] = 0x80000000u | a; sr_out[6] = (uint32_t) got << 16 | e; }
+        }
+      }
+      if (w) sr_cwr(a, sr_pat(wp, a, l), 3);
+      l = (l & 1) ? ((l >> 1) ^ 0x80200003u) : (l >> 1);
+    }
+    sr_out[1] = dn ? 0 : last;
+  }
+}
+static void sr_reset(int def, int j, int k) {
+  if (!sr_lo) { sr_lo = malloc(0x200000); sr_hi = malloc(0x200000); }
+  for (uint32_t i = 0; i < 0x200000; i++) { sr_lo[i] = (uint8_t) (i * 37); sr_hi[i] = (uint8_t) (i * 11 + 5); }
+  sr_def = def; sr_j = j; sr_k = k;
+  memset(sr_reg, 0, sizeof(sr_reg)); memset(sr_out, 0, sizeof(sr_out));
+  sr_reg[4] = 1; sr_reg[5] = 0x1FFFFF; sr_reg[6] = 2;
+}
+void host_wr(uint32_t off, uint32_t v) {
+  if (off >= 0x900 && off < 0x920) { int i = (int) (off - 0x900) / 4; if (i) sr_reg[i] = v; else sr_go(v); }
+}
+uint32_t host_rd(uint32_t off) {
+  if (off >= 0x900 && off < 0x920) return sr_out[(off - 0x900) / 4];
+  return 0;
+}
+
 // ---------------- RPC ----------------
 int rpc_enabled(void) { return 1; }
 static int fw_new = 1;   // the firmware has I2C_SCAN / LED
@@ -124,6 +200,40 @@ int main(int argc, char **argv) {
     keys(0x2C060500u); keys(0x2C060502u); run(200);                                           // B, C, Space with LShift
     regs[0x34 / 4] = (1u << 24) | (12u << 12) | 30u; run(50);
     regs[0x38 / 4] = 0x00410003u; run(200);                                                // joy L on + up + A, R on
+  }
+  else if (!strcmp(sc, "sram")) {
+    // a good memory: the first pass over, the second one under way
+    sr_reset(0, 0, 0);
+    int i = find("SRAM");
+    app_open(i);
+    while (groups[i].status == ST_RUN) run(1);
+    run(9);
+  }
+  else if (!strcmp(sc, "sram_fail")) {
+    sr_reset(1, 0, 7);   // MD7 stuck at 1 (the mock of Ф0)
+    int i = find("SRAM");
+    app_open(i);
+    while (groups[i].status == ST_RUN) run(1);
+    run(9);
+  }
+  else if (!strcmp(sc, "sram_diag")) {
+    // each defect of the model: the diagnosis names it
+    static const struct { int def, j, k; const char *want; } d[] = {
+      { 0, 0, 0, "no faults" }, { 1, 0, 7, "MD7 stuck at 1" }, { 2, 0, 12, "MD12 open" }, { 3, 2, 9, "MD2 and MD9" },
+      { 4, 5, 17, "MA5 and MA17 shorted" }, { 5, 20, 0, "MA20 open" }, { 6, 0, 0, "high byte" }, { 7, 0, 0, "low byte chip" } };
+    int i = find("SRAM"), bad = 0;
+    for (unsigned n = 0; n < sizeof(d) / sizeof(d[0]); n++) {
+      sr_reset(d[n].def, d[n].j, d[n].k);
+      groups[i].status = ST_IDLE;
+      app_open(i);
+      while (groups[i].status == ST_RUN) run(1);
+      press(K_ESC);
+      const char *g = sram_diag();
+      int ok = strstr(g, d[n].want) != 0;
+      bad |= !ok;
+      fprintf(stderr, "sram_diag: defect %d: %s [%s] %s\n", d[n].def, ok ? "ok" : "WRONG", groups[i].info, g);
+    }
+    fprintf(stderr, "sram_diag: %s\n", bad ? "FAIL" : "all ok");
   }
   else if (!strcmp(sc, "input_esc")) {
     // a short Esc stays on the page, a held one (over a second) leaves it

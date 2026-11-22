@@ -248,7 +248,13 @@ NET "pll_clk<2>" TNM_NET = "TG_CLK_CPU";
 TIMESPEC "TS_CPU_TO_SYS" = FROM "TG_CLK_CPU" TO "TG_CLK_SYS" 13.3 ns DATAPATHONLY;
 TIMESPEC "TS_SYS_TO_CPU" = FROM "TG_CLK_SYS" TO "TG_CLK_CPU" 13.3 ns DATAPATHONLY;
 
-# The SRAM and the SDRAM: idle in Ф0 (the tests of Ф2 add their constraints).
+# The SRAM (bt_sram, 10 ns): MA / MWR_N / MRD_N / MD out of IOB flip-flops on clk_cpu, MD into an IOB flip-flop
+# at the end of a two-clock read (26.7 ns: the 8 ns out, 10 ns of the SRAM, 4 ns in), as menu_sram of the menu.
+TIMEGRP "TG_SRAM_IN" = PADS("MD<*>");
+TIMEGRP "TG_SRAM_OUT" = "TG_SRAM_IN" PADS("MA<*>") PADS("MWR_N<*>") PADS("MRD_N<*>");
+TIMESPEC "TS_SRAM_OUT" = FROM FFS TO "TG_SRAM_OUT" 8 ns DATAPATHONLY;
+TIMESPEC "TS_SRAM_IN" = FROM "TG_SRAM_IN" TO FFS 4 ns DATAPATHONLY;
+# The SDRAM: idle until its tester.
 
 # MCU link (kg_mcu): SPI mode 0 from the RP2040 at 16 MHz (bursts would go at that speed too, BURST_MAX_MHZ 0);
 # bounded at 32 MHz as in the other cores.
