@@ -1,0 +1,21 @@
+{
+    "id": "boardtest",
+    "name": "Karabas Board Test",
+    "build": "26112201",
+    "visible": true,
+    "type": "osd",
+    "order": 250,
+    "eeprom_bank": 255,
+    "roms": [
+        {"filename": "roms/atlas1.bin", "address": 1048576},
+        {"filename": "roms/atlas4.bin", "address": 1114112},
+        {"filename": "roms/bt.bin", "address": 0}
+    ],
+    "boards": {
+        "minig": {"link": 2, "bitstream": "karabas_minig.bin"}
+    },
+    "osd": [
+        {"type": "T", "bits": 1, "name": "Reset", "options": null, "default": 0, "hotkey": "Ctrl+Alt+Del"},
+        {"type": "T", "bits": 1, "name": "Global Reset", "options": null, "default": 0, "hotkey": "Ctrl+Alt+Bkspace"}
+    ]
+}
