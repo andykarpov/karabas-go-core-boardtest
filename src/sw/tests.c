@@ -421,6 +421,7 @@ static const char *key_name(int c, char *b) {
 }
 
 static int32_t m_x, m_y, m_w;
+static int esc_held;            // Esc is in the keyboard register since v[6] (ms)
 extern int ms_dx, ms_dy;
 extern uint32_t ms_btn, ms_seq;
 
@@ -431,6 +432,7 @@ static void in_open(group_t *g) {
   g->v[4] = (int32_t) ms_seq;
   g->v[3] = -1;
   m_x = m_y = m_w = 0;
+  esc_held = 0;
   page_row(0, "Keys", "press keys (up to six at once)", C_DIM);
   page_hint("Hold Esc for a second to leave this page");
   set_status(g, ST_RUN, 0);
@@ -458,11 +460,11 @@ static void in_tick(group_t *g) {
     uint32_t e0 = R_KBD0, e1 = R_KBD1, c = K_ESC;
     int esc = ((e0 >> 8) & 0xFF) == c || ((e0 >> 16) & 0xFF) == c || (e0 >> 24) == c ||
               (e1 & 0xFF) == c || ((e1 >> 8) & 0xFF) == c || ((e1 >> 16) & 0xFF) == c;
-    if (!esc) g->v[6] = 0;
-    else if (!g->v[6]) g->v[6] = (int32_t) (now_ms() | 1);
+    if (!esc) esc_held = 0;
+    else if (!esc_held) { esc_held = 1; g->v[6] = (int32_t) now_ms(); }
   }
-  if (g->v[6] && now_ms() - (uint32_t) g->v[6] >= 1000) {
-    g->v[6] = 0;
+  if (esc_held && now_ms() - (uint32_t) g->v[6] >= 1000) {
+    esc_held = 0;
     set_status(g, g->v[0] && g->v[1] ? ST_PASS : ST_RUN, g->v[0] && g->v[1] ? "kbd, mouse" : 0);
     g->v[7] = 2;               // main.c leaves the page
     return;

@@ -82,7 +82,7 @@
 | CF / IDE | IDENTIFY, только чтение (карта стенда с чужими данными — не писать) | Go, шилд Mini G |
 | FT812 | REG_ID по SPI, на Mini / Mini G картинка через FT_DE / FT_CLK | Go, Mini, Mini G |
 | ESP8266 | AT, AT+GMR, скан Wi-Fi, CTS | все |
-| ESP32 | PCM (I²S) и SPI ESP32 | Mini G |
+| ESP32 | по SPI: модуль отвечает и сообщает версию — этого достаточно (пользователь 2026-11-22) | Mini G |
 | Звук | тон отдельно L и R, развёртка; DAC (PCM5102 / сигма-дельта Mini), BEEPER (Go) | все |
 | Вход | ADC PCM1808 — индикатор уровня; TAPE_IN — уровень и фронты | Mini, Mini G / все |
 | Петли кабелем | DAC → ADC (автоизмерение уровня / частоты), TAPE_OUT → TAPE_IN | по наличию |

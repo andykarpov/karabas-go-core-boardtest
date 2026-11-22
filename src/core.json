@@ -1,7 +1,7 @@
 {
     "id": "boardtest",
     "name": "Karabas Board Test",
-    "build": "26112204",
+    "build": "26112205",
     "visible": true,
     "type": "osd",
     "order": 250,
