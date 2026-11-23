@@ -7,7 +7,7 @@ A tile whose coverages are only 0 and 15 goes to the 1-bit atlas (code = its ind
 to the 4-bit one (code = 0x200 + its index). Pixel n = row * 10 + column of tile t is bit / nibble
 t * 200 + n of its atlas, the low bit / nibble of a byte first (as bt_tiles reads them)."""
 import sys
-from atlas import Atlas
+from atlas import Atlas, HALF_WORDS
 
 A1_MAX, A4_MAX = 8192 * 8 // 200, 4096 * 2 // 200   # the sizes of the RAMs in bt_tiles
 
@@ -40,11 +40,17 @@ def main(out1, out4, out_h):
          "#pragma once", "#include <stdint.h>", "",
          f"// 1-bit tiles {len(t1)} of {A1_MAX}, 4-bit tiles {len(t4)} of {A4_MAX}"]
     for name, i in sorted(a.id.items()):
-        if isinstance(i, int) and not name.startswith("ch:"):
+        if isinstance(i, int) and not name.startswith(("ch:", "half:")):
             h.append(f"#define T_{name.upper()} 0x{code[i]:03x}")
     h.append("// the font: the tile of character 32 + i")
     h.append("static const uint16_t t_font[95] = {")
     h.append("  " + ", ".join(f"0x{code[a.id['ch:' + chr(c)]]:03x}" for c in range(32, 127)) + " };")
+    h.append("// 3-letter status words half a cell to the right (centred in a 4-cell pill): 4 tiles each")
+    h.append("#define HALF_WORDS " + " ".join(f'"{w}\\0"' for w in HALF_WORDS))
+    h.append(f"static const uint16_t t_half[{len(HALF_WORDS)}][4] = {{")
+    for w in HALF_WORDS:
+        h.append("  { " + ", ".join(f"0x{code[a.id[f'half:{w}:{k}']]:03x}" for k in range(4)) + " },")
+    h.append("};")
     h.append("// the meter: k (0..10) columns filled")
     h.append(f"static const uint16_t t_bar[{a.cw + 1}] = {{ " + ", ".join(f"0x{code[a.id[f'bar{k}']]:03x}" for k in range(a.cw + 1)) + " };")
     cols, rows, idx = a.id["logo"]

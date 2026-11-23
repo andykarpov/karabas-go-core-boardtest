@@ -28,6 +28,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "assets")
 SS = 4  # supersampling of the shapes
+HALF_WORDS = ("RUN", "N/A")  # 3-letter status words drawn half a cell to the right: centred in a 4-cell pill
 
 
 def logo_bits(go=False):
@@ -71,6 +72,7 @@ class Atlas:
     def _font(self):
         """The text font (Terminus Bold 10 x 20), 1 bit."""
         t = terminus()
+        glyphs = {}
         for c in range(32, 127):
             img = Image.new("L", (self.cw, self.ch), 0)
             for y in range(20):
@@ -78,6 +80,13 @@ class Atlas:
                 for x in range(10):
                     if row >> (15 - x) & 1: img.putpixel((x, y), 255)
             self.add("ch:" + chr(c), img)
+            glyphs[chr(c)] = img
+        for w in HALF_WORDS:   # the word at x = cw / 2 over 4 cells (user 2026-11-23: RUN, N/A centred as "--")
+            img = Image.new("L", (4 * self.cw, self.ch), 0)
+            for i, ch in enumerate(w):
+                img.paste(glyphs[ch], (self.cw // 2 + i * self.cw, 0))
+            for k in range(4):
+                self.add(f"half:{w}:{k}", img.crop((k * self.cw, 0, (k + 1) * self.cw, self.ch)))
 
     def _shape(self, name, draw_fn):
         big = Image.new("L", (self.cw * SS, self.ch * SS), 0)
