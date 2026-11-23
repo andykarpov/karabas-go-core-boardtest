@@ -8,7 +8,7 @@ Writes main_<variant>.png and sram_<variant>.png for the cell / font variants of
 import os
 import sys
 from PIL import Image
-from atlas import Atlas
+from atlas import Atlas, HALF_WORDS
 
 W, H, V_GRAD = 800, 600, 450
 
@@ -63,6 +63,9 @@ class Screen:
 
     def pill(self, c, r, s, color):
         self.button(c, r, len(s) + 2, s, color, "text_a")
+        if len(s) == 4 and s.strip() in HALF_WORDS:   # half a cell to the right, as scr_pill
+            for k in range(4):
+                self.put(c + 1 + k, r, f"half:{s.strip()}:{k}", "text_a", color)
 
     def uline(self, c, r, w, fg="line"):
         for i in range(w):
