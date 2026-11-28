@@ -27,6 +27,7 @@ void scr_init(void) {
   R_PAL(C_LINE) = OPAQUE(0x6a8a92);
   R_PAL(C_LOGO) = OPAQUE(0xffffff);
   R_PAL(C_BLACK) = OPAQUE(0x000000);
+  R_PAL(C_PILL_T) = OPAQUE(0xffffff);   // the text of the status pills (fixed colours, not of the theme)
   R_GRAD_TOP = look.gradient;
   R_GRAD_BOT = look.bg;
   scr_clear();
@@ -70,13 +71,13 @@ void scr_button(int c, int r, int w, const char *s, int color, int fg, int left,
 }
 
 void scr_pill(int c, int r, const char *s, int color) {
-  scr_button(c, r, str_len(s) + 2, s, color, C_TEXT_A, 0, -2);
+  scr_button(c, r, str_len(s) + 2, s, color, C_PILL_T, 0, -2);
   // "RUN ", "N/A ": the word half a cell to the right, centred as " -- " (tiles of the atlas)
   static const char half[] = HALF_WORDS;
   if (str_len(s) != 4 || s[3] != ' ') return;
   for (int i = 0; half[i * 4]; i++)
     if (s[0] == half[i * 4] && s[1] == half[i * 4 + 1] && s[2] == half[i * 4 + 2])
-      for (int k = 0; k < 4; k++) scr_put(c + 1 + k, r, t_half[i][k], C_TEXT_A, color);
+      for (int k = 0; k < 4; k++) scr_put(c + 1 + k, r, t_half[i][k], C_PILL_T, color);
 }
 
 void scr_uline(int c, int r, int w, int fg) {

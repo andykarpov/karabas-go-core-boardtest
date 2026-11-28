@@ -53,7 +53,7 @@ static void meter_row(int r, const char *label, uint32_t v, int w) {
 }
 
 static void ask(group_t *g, const char *question) {
-  page_row(14, "", question, C_TEXT_A);
+  page_row(14, "", question, C_TEXT);
   page_row(15, "", "Y: yes   N: no", C_DIM);
   if (g->status != ST_ASK) set_status(g, ST_ASK, 0);
 }
@@ -390,7 +390,7 @@ static void vid_open(group_t *g) {
   g->v[0] = 0;
   page_row(0, "Output", board_name[0] == 'G' ? "VGA, 800 x 600 60 Hz" : (IO_BTN >> 8) & 1 ? "DVI, 800 x 600 60 Hz" : "HDMI, 800 x 600 60 Hz", C_TEXT);
   page_row(1, "Pictures", "colour bars, then ramps of white, red, green, blue", C_TEXT);
-  page_row(3, "", "Enter: the pictures (any key: the next one)", C_TEXT_A);
+  page_row(3, "", "Enter: the pictures (any key: the next one)", C_TEXT);
   set_status(g, ST_RUN, 0);
 }
 
@@ -456,7 +456,7 @@ static void in_tick(group_t *g) {
     char *p = t, b[8];
     for (int i = 0; i < 6; i++) if (codes[i]) { p = str_cpy(p, key_name((int) codes[i], b)); *p++ = ' '; }
     *p = 0;
-    page_row(0, "Keys", t[0] ? t : "-", C_TEXT_A);
+    page_row(0, "Keys", t[0] ? t : "-", C_TEXT);
     int c = PX + 10;
     for (int i = 0; i < 8; i++) c = scr_text(c, PROW + 1, mods[i], (k0 >> i) & 1 ? C_PASS : C_IDLE, C_NONE) + 1;
     scr_text(PX, PROW + 1, "Modifiers", C_DIM, C_NONE);
