@@ -212,8 +212,15 @@ int rpc_call(uint8_t svc, uint8_t fn, const void *in, uint16_t in_len, void *out
   }
   else if (svc == RPC_CFG && fn == 0) {
     // the Ocean theme of the bench
+    // (THEME=bg,gradient,button,active,text,text_active,copyright in hex: another theme)
     static const char *v[7] = { "000608", "006a80", "0e2228", "00a0b8", "e0fcff", "ffffff", "5a8088" };
-    for (int i = 0; i < 7; i++) { o[n++] = 1; strcpy((char *) o + n, v[i]); n += 7; }
+    const char *t = getenv("THEME");
+    for (int i = 0; i < 7; i++) {
+      o[n++] = 1;
+      if (t && strlen(t) >= 6u * (i + 1) + i) { memcpy(o + n, t + 7 * i, 6); o[n + 6] = 0; }
+      else strcpy((char *) o + n, v[i]);
+      n += 7;
+    }
   } else return RPC_UNKNOWN;
   if (out_len) *out_len = n;
   return RPC_OK;

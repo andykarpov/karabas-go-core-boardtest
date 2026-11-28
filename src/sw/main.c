@@ -64,7 +64,7 @@ static int st_color(int st) {
 static void draw_group(int i) {
   group_t *g = &groups[i];
   int col = i < PER_COL ? 1 : COL2, row = 8 + 2 * (i % PER_COL);
-  scr_button(col, row, 17, g->name, i == sel ? C_ACTIVE : C_BUTTON, C_TEXT_A, 1, -2);
+  scr_button(col, row, 17, g->name, i == sel ? C_ACTIVE : C_BUTTON, i == sel ? C_TEXT_A : C_TEXT, 1, -2);
   scr_pill(col + 18, row, st_text(g->status), st_color(g->status));
   scr_text_n(col + 25, row, g->info[0] ? g->info : g->status == ST_RUN ? "running" : "not run", COL2 - 2 - 25 + (col == 1 ? 0 : 1), C_DIM, C_NONE);
 }
@@ -153,8 +153,8 @@ static void auto_step(void) {
 #define VROW 26
 static void draw_verdict(void) {
   scr_fill(1, VROW, COLS - 2, C_NONE);
-  scr_button(1, VROW, 10, "Auto", auto_on && !auto_loop ? C_ACTIVE : C_BUTTON, C_TEXT_A, 0, -2);
-  scr_button(12, VROW, 10, "Loop", auto_on && auto_loop ? C_ACTIVE : C_BUTTON, C_TEXT_A, 0, -2);
+  scr_button(1, VROW, 10, "Auto", auto_on && !auto_loop ? C_ACTIVE : C_BUTTON, auto_on && !auto_loop ? C_TEXT_A : C_TEXT, 0, -2);
+  scr_button(12, VROW, 10, "Loop", auto_on && auto_loop ? C_ACTIVE : C_BUTTON, auto_on && auto_loop ? C_TEXT_A : C_TEXT, 0, -2);
   char t[64], *p = t;
   int color = C_TEXT, fails = 0, left = 0, any = 0;
   for (int i = 0; i < ngroups; i++) {
@@ -187,7 +187,7 @@ static void draw_header(void) {   // no clock (user 2026-11-23: it did not fit t
 
 static void draw_main(void) {
   draw_header();
-  scr_text(1, 5, "Karabas Board Test", C_TEXT_A, C_NONE);
+  scr_text(1, 5, "Karabas Board Test", C_TEXT, C_NONE);
   char t[48], *p = t;
   p = str_cpy(p, board_name); p = str_cpy(p, "  fw "); p = str_cpy(p, fw_build);
   scr_text(COLS - 1 - (int) (p - t), 5, t, C_DIM, C_NONE);
@@ -209,13 +209,13 @@ static void draw_page_list(void) {
     group_t *g = &groups[i];
     int dot = g->status == ST_PASS ? C_PASS : g->status == ST_FAIL ? C_FAIL :
               (g->status == ST_RUN || g->status == ST_ASK) ? C_RUN : -1;
-    scr_button(1, 5 + 2 * k, 17, g->name, i == open_g ? C_ACTIVE : C_BUTTON, C_TEXT_A, 0, dot);
+    scr_button(1, 5 + 2 * k, 17, g->name, i == open_g ? C_ACTIVE : C_BUTTON, i == open_g ? C_TEXT_A : C_TEXT, 0, dot);
   }
 }
 
 void page_title(group_t *g) {
   scr_fill(PX, 5, COLS - PX - 1, C_NONE);
-  int c = scr_text(PX, 5, g->name, C_TEXT_A, C_NONE);
+  int c = scr_text(PX, 5, g->name, C_TEXT, C_NONE);
   scr_pill(c + 2, 5, st_text(g->status), st_color(g->status));
   scr_uline(PX, 6, COLS - PX - 1, C_LINE);
 }

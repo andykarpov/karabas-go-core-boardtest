@@ -7,7 +7,7 @@
 // the colours (palette entries); 0 is transparent (the gradient shows through)
 enum {
   C_NONE = 0, C_TEXT, C_TEXT_A, C_FOOT, C_DIM, C_BUTTON, C_ACTIVE, C_PASS, C_FAIL, C_RUN, C_IDLE, C_LINE,
-  C_LOGO, C_BLACK, C_COUNT
+  C_LOGO, C_BLACK, C_PILL_T, C_COUNT
 };
 
 // the colours of the [ft812] section of karabas.ini (the theme of the boot menu)
